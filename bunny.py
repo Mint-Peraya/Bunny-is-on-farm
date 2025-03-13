@@ -164,44 +164,44 @@ class Bunny:
 
 
 
-# Initialize pygame
-pygame.init()
+# # Initialize pygame
+# pygame.init()
 
-# Screen dimensions
-screen = pygame.display.set_mode(Config.get('window'))
+# # Screen dimensions
+# screen = pygame.display.set_mode(Config.get('window'))
 
-# Create bunny instance
-bunny = Bunny(Config.get('wx')// 2, Config.get('wy') // 2)
+# # Create bunny instance
+# bunny = Bunny(Config.get('wx')// 2, Config.get('wy') // 2)
 
-rect_size = 64
-rect_x = (800 ) // 2
-rect_y = (600 ) // 2
+# rect_size = 64
+# rect_x = (800 ) // 2
+# rect_y = (600 ) // 2
 
-run = True
-while run:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            run = False
+# run = True
+# while run:
+#     for event in pygame.event.get():
+#         if event.type == pygame.QUIT:
+#             run = False
 
-    # Get key presses
-    keys = pygame.key.get_pressed()
-    moving = bunny.move(keys)
-    bunny.update_animation(moving)
-    bunny.update()
+#     # Get key presses
+#     keys = pygame.key.get_pressed()
+#     moving = bunny.move(keys)
+#     bunny.update_animation(moving)
+#     bunny.update()
 
-    # Clear the screen (MUST come before drawing objects)
-    screen.fill((100, 100, 100))
+#     # Clear the screen (MUST come before drawing objects)
+#     screen.fill((100, 100, 100))
 
-    # Draw the red rectangle in the center (AFTER filling the screen)
-    pygame.draw.rect(screen, (255, 0, 0), (rect_x, rect_y, rect_size, rect_size)) 
+#     # Draw the red rectangle in the center (AFTER filling the screen)
+#     pygame.draw.rect(screen, (255, 0, 0), (rect_x, rect_y, rect_size, rect_size)) 
 
-    # Draw the bunny
-    bunny.draw(screen)
+#     # Draw the bunny
+#     bunny.draw(screen)
 
-    # Update the display
-    pygame.display.update()
+#     # Update the display
+#     pygame.display.update()
 
-    # Cap the frame rate
-    pygame.time.Clock().tick(60)
+#     # Cap the frame rate
+#     pygame.time.Clock().tick(60)
 
-pygame.quit()
+# pygame.quit()
