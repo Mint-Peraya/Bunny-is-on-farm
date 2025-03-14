@@ -2,6 +2,7 @@ import pygame
 from config import Config
 import random
 
+
 class Frame:
     def __init__(self, image):
         self.sheet = image
@@ -16,10 +17,12 @@ class Frame:
 
 class Bunny:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
-        self.normal_speed = 5  # Base speed
+        self.x = x  # Grid position (column)
+        self.y = y  # Grid position (row)
+        self.normal_speed = 0.1  # Base speed (fraction of a cell per frame)
         self.speed = self.normal_speed
+        self.target_x = x  # Target position for smooth movement
+        self.target_y = y
         self.health = 100
         self.rect = pygame.Rect(self.x, self.y, 64, 64)  # Collision detection
         self.attack_cooldown = 0  
@@ -50,8 +53,8 @@ class Bunny:
         self.frame_time = 60
         self.last_update_time = pygame.time.get_ticks()
 
-    def move(self, keys):
-        """Update bunny's position based on key presses."""
+    def move(self, keys, maze):
+        """Update bunny's position based on key presses and maze walls."""
         moving = False
         current_time = pygame.time.get_ticks()
         new_direction = self.current_direction  # Track if direction changes
@@ -72,71 +75,73 @@ class Bunny:
             self.speed_boost_cooldown_start = current_time  
 
         # Movement & Direction Change Detection
-        if keys[pygame.K_LEFT]:
-            self.x -= self.speed
-            new_direction = 'left'
-            moving = True
-        elif keys[pygame.K_RIGHT]:
-            self.x += self.speed
-            new_direction = 'right'
-            moving = True
-        elif keys[pygame.K_UP]:
-            self.y -= self.speed
-            new_direction = 'back'
-            moving = True
-        elif keys[pygame.K_DOWN]:
-            self.y += self.speed
-            new_direction = 'front'
-            moving = True
+        if self.x == self.target_x and self.y == self.target_y:  # Only move if bunny has reached the target
+            if keys[pygame.K_LEFT]:
+                new_x = self.x - 1
+                if 0 <= new_x < Config.get('grid') and maze.grid[self.y][new_x] == 0:
+                    self.target_x = new_x
+                    new_direction = 'left'
+                    moving = True
+            elif keys[pygame.K_RIGHT]:
+                new_x = self.x + 1
+                if 0 <= new_x < Config.get('grid') and maze.grid[self.y][new_x] == 0:
+                    self.target_x = new_x
+                    new_direction = 'right'
+                    moving = True
+            elif keys[pygame.K_UP]:
+                new_y = self.y - 1
+                if 0 <= new_y < Config.get('grid') and maze.grid[new_y][self.x] == 0:
+                    self.target_y = new_y
+                    new_direction = 'back'
+                    moving = True
+            elif keys[pygame.K_DOWN]:
+                new_y = self.y + 1
+                if 0 <= new_y < Config.get('grid') and maze.grid[new_y][self.x] == 0:
+                    self.target_y = new_y
+                    new_direction = 'front'
+                    moving = True
+
+        # Smoothly move towards the target position
+        if self.x < self.target_x:
+            self.x = min(self.x + self.speed, self.target_x)
+        elif self.x > self.target_x:
+            self.x = max(self.x - self.speed, self.target_x)
+        if self.y < self.target_y:
+            self.y = min(self.y + self.speed, self.target_y)
+        elif self.y > self.target_y:
+            self.y = max(self.y - self.speed, self.target_y)
 
         # If direction changed, reset animation frame
         if new_direction != self.current_direction:
             self.current_direction = new_direction
             self.current_frame = 0  # Reset frame to avoid out-of-range issues
 
-        self.rect.topleft = (self.x, self.y)
+        self.rect.topleft = (self.x * Config.get('bun_size'), self.y * Config.get('bun_size'))
         return moving
 
-    def attack(self, enemies):
-        """Attack enemies in range."""
-        if self.attack_cooldown == 0:
-            for enemy in enemies:
-                if self.rect.colliderect(enemy.rect):  # Check if bunny is colliding with an enemy
-                    enemy.take_damage()
-            self.attack_cooldown = 20  # Cooldown frames before next attack
-
-    def update(self):
-        """Update bunny's status."""
-        if self.attack_cooldown > 0:
-            self.attack_cooldown -= 1
-
-    def draw(self, screen):
+    def draw(self, screen, camera_x, camera_y):
         """Draw the bunny's current frame on the screen."""
         # Draw the current frame based on direction
-        if self.current_direction == 'front':
-            screen.blit(self.frames_front[self.current_frame], (self.x, self.y))
-        elif self.current_direction == 'left':
-            screen.blit(self.frames_left[self.current_frame], (self.x, self.y))
-        elif self.current_direction == 'right':
-            screen.blit(self.frames_right[self.current_frame], (self.x, self.y))
-        elif self.current_direction == 'back':
-            screen.blit(self.frames_back[self.current_frame], (self.x, self.y))
+        frame_dict = {
+            'front': self.frames_front,
+            'left': self.frames_left,
+            'right': self.frames_right,
+            'back': self.frames_back
+        }
+
+        # Ensure current_frame is within bounds
+        frames = frame_dict.get(self.current_direction, [])
+        if frames:
+            self.current_frame = self.current_frame % len(frames)  # Prevent IndexError
+            screen.blit(frames[self.current_frame], (self.x * Config.get('bun_size') - camera_x, self.y * Config.get('bun_size') - camera_y))
 
         # Draw health bar
-        self.draw_health_bar(screen)
+        self.draw_health_bar(screen, camera_x, camera_y)
 
-    def draw_health_bar(self, screen):
+    def draw_health_bar(self, screen, camera_x, camera_y):
         """Draw the bunny's health bar on the screen."""
-        pygame.draw.rect(screen, (255, 0, 0), (self.x +8, self.y - 10, 50, 5))  # Red health bar background
-        pygame.draw.rect(screen, (0, 255, 0), (self.x +8, self.y - 10, self.health / 2, 5))  # Green health bar
-
-    def take_damage(self):
-        """Reduce health when taking damage."""
-        self.health -= 1
-        if self.health <= 0:
-            print("Game Over!")
-            pygame.quit()
-            exit()
+        pygame.draw.rect(screen, (255, 0, 0), (self.x * Config.get('bun_size') - camera_x + 8, self.y * Config.get('bun_size') - camera_y - 10, 50, 5))  # Red health bar background
+        pygame.draw.rect(screen, (0, 255, 0), (self.x * Config.get('bun_size') - camera_x + 8, self.y * Config.get('bun_size') - camera_y - 10, self.health / 2, 5))  # Green health bar
 
     def update_animation(self, moving):
         """Update the frame if moving."""
@@ -151,9 +156,9 @@ class Bunny:
             }
             
             if self.current_direction in frame_dict:
-                max_frames = len(frame_dict[self.current_direction])  # Get correct frame count
-                if max_frames > 0:
-                    self.current_frame = (self.current_frame + 1) % max_frames  # Prevent IndexError
+                frames = frame_dict[self.current_direction]
+                if frames:
+                    self.current_frame = (self.current_frame + 1) % len(frames)  # Prevent IndexError
             
             self.last_update_time = current_time  # Update time
 

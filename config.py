@@ -7,8 +7,7 @@ class Config:
         'wx' : 800,
         'wy' : 600,
         'grid': 10,
-        'GRID_COUNT_W': 80,
-        'GRID_COUNT_H': 60,
+        'bun_size': 64,
         'black': (0,0,0),
         'white': (255,255,255),
         'red': (255,0,0),
@@ -16,11 +15,15 @@ class Config:
         'peach': (255,200,200),
         'sky': (200,255,255),
         'purple':(200,0,210),
+        'maze': 50*64,
+        # Maze size (50*50 grid)
+        'grid': 50
     }
 
     @classmethod
     def get(cls,key):
         return cls.__ALL_CONFIGS[key]
+
 
 # Use pygame.mixer.init() to initialize the mixer.
 
