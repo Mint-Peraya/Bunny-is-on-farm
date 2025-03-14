@@ -7,7 +7,7 @@ from bunny import Frame
 # Constants
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600  # Screen size
 CELL_SIZE = 64  # Each cell is 64x64 pixels
-MAZE_WIDTH, MAZE_HEIGHT = 12 * CELL_SIZE, 9 * CELL_SIZE  # Maze size (12x9 grid)
+MAZE_WIDTH, MAZE_HEIGHT = 50 * CELL_SIZE, 50 * CELL_SIZE  # Maze size (12x9 grid)
 ROWS, COLS = MAZE_HEIGHT // CELL_SIZE, MAZE_WIDTH // CELL_SIZE  # Grid size
 
 # Colors
@@ -27,18 +27,28 @@ class Maze:
         self.cols = cols
         self.grid = [[1 for _ in range(cols)] for _ in range(rows)]  # 1 means wall
         self.generate_maze(1, 1)  # Start generating from (1, 1) to leave outer walls intact
+        self.add_loops(10)  # Add loops to make the maze more complex
     
     def generate_maze(self, x, y):
+        """Generate a maze using recursive backtracking."""
         self.grid[y][x] = 0  # Mark the starting point as a path (0)
-        random.shuffle(DIRECTIONS)
-        
-        # Try to carve paths
-        for dx, dy in DIRECTIONS:
+        directions = DIRECTIONS.copy()
+        random.shuffle(directions)
+
+        for dx, dy in directions:
             nx, ny = x + dx * 2, y + dy * 2
             if 0 <= nx < self.cols and 0 <= ny < self.rows and self.grid[ny][nx] == 1:
                 self.grid[y + dy][x + dx] = 0  # Create a passage to the new cell
                 self.generate_maze(nx, ny)  # Recursively generate from the new position
-    
+
+    def add_loops(self, num_loops):
+        """Add loops to the maze by randomly removing walls."""
+        for _ in range(num_loops):
+            x = random.randint(1, self.cols - 2)
+            y = random.randint(1, self.rows - 2)
+            if self.grid[y][x] == 1:  # Only remove walls
+                self.grid[y][x] = 0
+
     def draw(self, screen, camera_x, camera_y):
         """Draw the maze on the screen with camera offset."""
         for y in range(self.rows):
@@ -195,11 +205,14 @@ class Bunny:
             
             self.last_update_time = current_time  # Update time
 
-def get_random_exit(maze):
+def get_random_exit(maze, bunny_x, bunny_y, min_distance=20):
+    """Get a random exit position that is at least `min_distance` cells away from the bunny."""
     while True:
         exit_x, exit_y = random.randint(1, COLS - 2), random.randint(1, ROWS - 2)
         if maze.grid[exit_y][exit_x] == 0:  # Ensure exit is on a path
-            return exit_x, exit_y
+            distance = abs(exit_x - bunny_x) + abs(exit_y - bunny_y)  # Manhattan distance
+            if distance >= min_distance:
+                return exit_x, exit_y
 
 def draw_text(screen, text, font_size, color, position):
     font = pygame.font.SysFont(None, font_size)
@@ -236,7 +249,7 @@ def main():
 
     maze = Maze(ROWS, COLS)
     bunny = Bunny(1, 1)  # Start bunny inside the maze, not on the wall
-    exit_x, exit_y = get_random_exit(maze)
+    exit_x, exit_y = get_random_exit(maze, bunny.x, bunny.y, min_distance=5)  # Ensure exit is far from bunny
 
     running = True
     game_over = False
@@ -272,7 +285,7 @@ def main():
             pygame.time.wait(2000)  # Wait for 2 seconds before restarting the game
             maze = Maze(ROWS, COLS)  # Regenerate maze
             bunny = Bunny(1, 1)  # Reset bunny
-            exit_x, exit_y = get_random_exit(maze)  # Get a new exit position
+            exit_x, exit_y = get_random_exit(maze, bunny.x, bunny.y, min_distance=5)  # Get a new exit position
             game_over = False
         
         for event in pygame.event.get():
@@ -282,7 +295,7 @@ def main():
                 if event.key == pygame.K_r:  # Restart the game
                     maze = Maze(ROWS, COLS)
                     bunny = Bunny(1, 1)
-                    exit_x, exit_y = get_random_exit(maze)
+                    exit_x, exit_y = get_random_exit(maze, bunny.x, bunny.y, min_distance=5)
         
         # Get key presses
         keys = pygame.key.get_pressed()

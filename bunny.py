@@ -2,7 +2,7 @@ import pygame
 from config import Config
 import random
 
-class Frame():
+class Frame:
     def __init__(self, image):
         self.sheet = image
 
@@ -97,9 +97,6 @@ class Bunny:
         self.rect.topleft = (self.x, self.y)
         return moving
 
-
-
-
     def attack(self, enemies):
         """Attack enemies in range."""
         if self.attack_cooldown == 0:
@@ -160,48 +157,3 @@ class Bunny:
             
             self.last_update_time = current_time  # Update time
 
-
-
-
-
-# # Initialize pygame
-# pygame.init()
-
-# # Screen dimensions
-# screen = pygame.display.set_mode(Config.get('window'))
-
-# # Create bunny instance
-# bunny = Bunny(Config.get('wx')// 2, Config.get('wy') // 2)
-
-# rect_size = 64
-# rect_x = (800 ) // 2
-# rect_y = (600 ) // 2
-
-# run = True
-# while run:
-#     for event in pygame.event.get():
-#         if event.type == pygame.QUIT:
-#             run = False
-
-#     # Get key presses
-#     keys = pygame.key.get_pressed()
-#     moving = bunny.move(keys)
-#     bunny.update_animation(moving)
-#     bunny.update()
-
-#     # Clear the screen (MUST come before drawing objects)
-#     screen.fill((100, 100, 100))
-
-#     # Draw the red rectangle in the center (AFTER filling the screen)
-#     pygame.draw.rect(screen, (255, 0, 0), (rect_x, rect_y, rect_size, rect_size)) 
-
-#     # Draw the bunny
-#     bunny.draw(screen)
-
-#     # Update the display
-#     pygame.display.update()
-
-#     # Cap the frame rate
-#     pygame.time.Clock().tick(60)
-
-# pygame.quit()
