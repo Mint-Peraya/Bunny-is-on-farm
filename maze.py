@@ -30,6 +30,6 @@ class Maze:
     def draw(self, screen, camera_x, camera_y):
         for y in range(self.rows):
             for x in range(self.cols):
-                color = Config.get('green') if self.grid[y][x] == 1 else Config.get('white')
+                color = Config.get('black') if self.grid[y][x] == 1 else Config.get('white')
                 pygame.draw.rect(screen, color,
                                  (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y, Config.get('bun_size'), Config.get('bun_size')))

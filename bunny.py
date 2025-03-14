@@ -2,7 +2,6 @@ import pygame
 from config import Config
 import random
 
-
 class Frame:
     def __init__(self, image):
         self.sheet = image
@@ -14,7 +13,6 @@ class Frame:
         image.set_colorkey(colour)
         return image
 
-
 class Bunny:
     def __init__(self, x, y):
         self.x = x  # Grid position (column)
@@ -25,7 +23,7 @@ class Bunny:
         self.target_y = y
         self.health = 100
         self.rect = pygame.Rect(self.x, self.y, 64, 64)  # Collision detection
-        self.attack_cooldown = 0  
+        self.attack_cooldown = 0  # Cooldown for attacks
 
         # Speed Boost Variables
         self.speed_boost_active = False
@@ -42,16 +40,19 @@ class Bunny:
         self.back_sheet = Frame(pygame.image.load('BunnyWalkBack-Sheet.png').convert_alpha())
         self.right_sheet = Frame(pygame.image.load('BunnyWalkright-Sheet.png').convert_alpha())
         self.left_sheet = Frame(pygame.image.load('BunnyWalkleft-Sheet.png').convert_alpha())
+        # self.attack_sheet = Frame(pygame.image.load('BunnyAttack-Sheet.png').convert_alpha())
 
         self.frames_front = [self.front_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
         self.frames_back = [self.back_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
         self.frames_right = [self.right_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
         self.frames_left = [self.left_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
+        # self.frames_attack = [self.attack_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(6)]
 
         self.current_direction = 'front'
         self.current_frame = 0
         self.frame_time = 60
         self.last_update_time = pygame.time.get_ticks()
+        self.attacking = False
 
     def move(self, keys, maze):
         """Update bunny's position based on key presses and maze walls."""
@@ -119,6 +120,29 @@ class Bunny:
         self.rect.topleft = (self.x * Config.get('bun_size'), self.y * Config.get('bun_size'))
         return moving
 
+    def attack(self, enemies):
+        """Attack enemies in range."""
+        current_time = pygame.time.get_ticks()
+        if current_time - self.attack_cooldown > 500:  # 500 ms cooldown
+            self.attacking = True
+            self.attack_cooldown = current_time
+            for enemy in enemies:
+                if self.rect.colliderect(enemy.rect):
+                    enemy.take_damage(10)  # Deal 10 damage to the enemy
+
+    def take_damage(self, amount):
+        """Reduce bunny's health by the specified amount."""
+        self.health -= amount
+        if self.health <= 0:
+            self.health = 0
+            # Handle game over logic here
+
+    def heal(self, amount):
+        """Increase bunny's health by the specified amount."""
+        self.health += amount
+        if self.health > 100:
+            self.health = 100
+
     def draw(self, screen, camera_x, camera_y):
         """Draw the bunny's current frame on the screen."""
         # Draw the current frame based on direction
@@ -126,7 +150,8 @@ class Bunny:
             'front': self.frames_front,
             'left': self.frames_left,
             'right': self.frames_right,
-            'back': self.frames_back
+            'back': self.frames_back,
+            # 'attack': self.frames_attack
         }
 
         # Ensure current_frame is within bounds
@@ -147,18 +172,20 @@ class Bunny:
         """Update the frame if moving."""
         current_time = pygame.time.get_ticks()
         
-        if moving and current_time - self.last_update_time > self.frame_time:
+        if (moving or self.attacking) and current_time - self.last_update_time > self.frame_time:
             frame_dict = {
                 'front': self.frames_front,
                 'left': self.frames_left,
                 'right': self.frames_right,
-                'back': self.frames_back
+                'back': self.frames_back,
+                # 'attack': self.frames_attack
             }
             
             if self.current_direction in frame_dict:
                 frames = frame_dict[self.current_direction]
                 if frames:
                     self.current_frame = (self.current_frame + 1) % len(frames)  # Prevent IndexError
+                    if self.attacking and self.current_frame == 0:
+                        self.attacking = False  # Reset attacking state after animation
             
             self.last_update_time = current_time  # Update time
-

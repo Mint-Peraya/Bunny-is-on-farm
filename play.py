@@ -4,41 +4,8 @@ import sys
 import math
 from bunny import Bunny
 from config import Config
-
-
-
-class Maze:
-    DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
-    def __init__(self, rows, cols):
-        self.rows = rows
-        self.cols = cols
-        self.grid = [[1 for _ in range(cols)] for _ in range(rows)]
-        self.generate_maze(1, 1)
-        self.add_loops(10)
-
-    def generate_maze(self, x, y):
-        self.grid[y][x] = 0
-        directions = self.DIRECTIONS.copy()
-        random.shuffle(directions)
-        for dx, dy in directions:
-            nx, ny = x + dx * 2, y + dy * 2
-            if 0 <= nx < self.cols and 0 <= ny < self.rows and self.grid[ny][nx] == 1:
-                self.grid[y + dy][x + dx] = 0
-                self.generate_maze(nx, ny)
-
-    def add_loops(self, num_loops):
-        for _ in range(num_loops):
-            x, y = random.randint(1, self.cols - 2), random.randint(1, self.rows - 2)
-            if self.grid[y][x] == 1:
-                self.grid[y][x] = 0
-
-    def draw(self, screen, camera_x, camera_y):
-        for y in range(self.rows):
-            for x in range(self.cols):
-                color = Config.get('black') if self.grid[y][x] == 1 else Config.get('white')
-                pygame.draw.rect(screen, color,
-                                 (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y, Config.get('bun_size'), Config.get('bun_size')))
-
+from maze import Maze
+from dungeon import Dungeon  # Import the Dungeon class
 
 class Game:
     def __init__(self):
@@ -49,7 +16,9 @@ class Game:
         self.reset_game()
 
     def reset_game(self):
+        # Initialize both Maze and Dungeon
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
+        self.dungeon = Dungeon()  # Create a Dungeon instance
         self.bunny = Bunny(1, 1)
         self.exit_x, self.exit_y = self.get_random_exit()
         self.game_over = False
@@ -86,30 +55,54 @@ class Game:
         keys = pygame.key.get_pressed()
         moving = self.bunny.move(keys, self.maze)
         self.bunny.update_animation(moving)
+        
+        # Update dungeon enemies
+        self.dungeon.update(self.bunny)
+        
+        # Check for collisions with enemies
+        if self.dungeon.check_collision(self.bunny):
+            self.bunny.take_damage(1)
+            if self.bunny.health <= 0:
+                self.game_over = True
+                self.draw_text("Game Over!", 55, Config.get('red'), (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
+                pygame.display.flip()
+                pygame.time.wait(200)
+                self.reset_game()
+        
+        # Update camera position
         self.camera_x += (self.bunny.x * Config.get('bun_size') - Config.get('wx') // 2 - self.camera_x) * 0.1
         self.camera_y += (self.bunny.y * Config.get('bun_size') - Config.get('wy') // 2 - self.camera_y) * 0.1
 
     def render(self):
         self.screen.fill(Config.get('black'))
-        self.maze.draw(self.screen, self.camera_x, self.camera_y)
-        self.bunny.draw(self.screen, self.camera_x, self.camera_y)
-        # portal
-        pygame.draw.rect(self.screen, Config.get('purple'),
-                         (1 * Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')))
-        # chest
-        pygame.draw.rect(self.screen, Config.get('peach'), (
-        # portal
-        self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')))
-        pygame.draw.rect(self.screen, Config.get('purple'), (
-        self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')), 3)
         
+        # Draw the maze
+        self.maze.draw(self.screen, self.camera_x, self.camera_y)
+        
+        # Draw the dungeon (enemies and background)
+        self.dungeon.draw(self.screen)
+        
+        # Draw the bunny
+        self.bunny.draw(self.screen, self.camera_x, self.camera_y)
+        
+        # Draw the portal
+        pygame.draw.rect(self.screen, Config.get('purple'), (
+            self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')), 3)
+        
+        # Draw the compass
         self.draw_compass()
+        
+        # Check for win condition
         if self.bunny.x == self.exit_x and self.bunny.y == self.exit_y:
             self.game_over = True
             self.draw_text("You Win!", 55, Config.get('green'), (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
             pygame.display.flip()
             pygame.time.wait(2000)
             self.reset_game()
+        
+        # Display health
+        self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
+        
         pygame.display.flip()
 
     def run(self):
