@@ -4,17 +4,7 @@ import sys
 import math
 from bunny import Bunny
 from config import Config
-# Constants
 
-# CELL_SIZE = 64
-# MAZE_WIDTH, MAZE_HEIGHT = 50 * CELL_SIZE, 50 * CELL_SIZE
-# ROWS, COLS = MAZE_HEIGHT // CELL_SIZE, MAZE_WIDTH // CELL_SIZE
-
-# Colors
-
-
-BROWN = (139, 69, 19)
-RED = (255, 0, 0)
 
 
 class Maze:
@@ -83,7 +73,7 @@ class Game:
         pygame.draw.circle(self.screen, Config.get('white'), (compass_x, compass_y), compass_radius, 2)
         arrow_end_x = compass_x + (compass_radius - 10) * math.cos(angle)
         arrow_end_y = compass_y + (compass_radius - 10) * math.sin(angle)
-        pygame.draw.line(self.screen, RED, (compass_x, compass_y), (arrow_end_x, arrow_end_y), 3)
+        pygame.draw.line(self.screen, Config.get('red'), (compass_x, compass_y), (arrow_end_x, arrow_end_y), 3)
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -106,7 +96,8 @@ class Game:
         # portal
         pygame.draw.rect(self.screen, Config.get('purple'),
                          (1 * Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')))
-        pygame.draw.rect(self.screen, BROWN, (
+        # chest
+        pygame.draw.rect(self.screen, Config.get('peach'), (
         # portal
         self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')))
         pygame.draw.rect(self.screen, Config.get('purple'), (

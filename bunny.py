@@ -66,7 +66,7 @@ class Bunny:
         if keys[pygame.K_f] and not self.speed_boost_active and not self.speed_boost_cooldown:
             self.speed_boost_active = True
             self.speed_boost_start_time = current_time
-            self.speed = self.normal_speed * 2  
+            self.speed = self.normal_speed * 1.5
 
         if self.speed_boost_active and current_time - self.speed_boost_start_time >= self.speed_boost_duration:
             self.speed_boost_active = False
