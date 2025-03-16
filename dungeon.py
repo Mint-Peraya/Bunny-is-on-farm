@@ -1,6 +1,7 @@
 import pygame
 import random
 from config import Config
+from maze import Maze
 
 class Dungeon:
     def __init__(self):
@@ -10,7 +11,7 @@ class Dungeon:
 
     def draw(self, screen):
         if self.type == "maze":
-            screen.fill((30, 30, 30))  # Darker background for maze
+            Maze((Config.get('grid'),Config.get('grid')))  # Darker background for maze
         else:
             screen.fill((50, 50, 50))  # PVP dungeon background
         

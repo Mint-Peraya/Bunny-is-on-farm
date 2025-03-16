@@ -6,7 +6,6 @@ class Config:
         'window': (800,600),
         'wx' : 800,
         'wy' : 600,
-        'grid': 10,
         'bun_size': 64,
         'black': (0,0,0),
         'white': (255,255,255),
