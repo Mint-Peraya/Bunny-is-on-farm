@@ -1,5 +1,6 @@
 import pygame
 from config import Config
+from pathlib import Path
 import random
 
 class Frame:
@@ -24,6 +25,8 @@ class Bunny:
         self.health = 100
         self.rect = pygame.Rect(self.x, self.y, 64, 64)  # Collision detection
         self.attack_cooldown = 0  # Cooldown for attacks
+        SCRIPT_DIR = Path(__file__).parent
+        self.IMAGE_FOLDER = SCRIPT_DIR / "picture"
 
         # Speed Boost Variables
         self.speed_boost_active = False
@@ -37,10 +40,10 @@ class Bunny:
 
         # Load sprite sheets
         self.sheet = {
-        'front_sheet': Frame(pygame.image.load('BunnyWalk-Sheet.png').convert_alpha()),
-        'back_sheet' : Frame(pygame.image.load('BunnyWalkBack-Sheet.png').convert_alpha()),
-        'right_sheet': Frame(pygame.image.load('BunnyWalkright-Sheet.png').convert_alpha()),
-        'left_sheet' : Frame(pygame.image.load('BunnyWalkleft-Sheet.png').convert_alpha())
+        'front_sheet': Frame(pygame.image.load(self.IMAGE_FOLDER/'BunnyWalk-Sheet.png').convert_alpha()),
+        'back_sheet' : Frame(pygame.image.load(self.IMAGE_FOLDER/'BunnyWalkBack-Sheet.png').convert_alpha()),
+        'right_sheet': Frame(pygame.image.load(self.IMAGE_FOLDER/'BunnyWalkright-Sheet.png').convert_alpha()),
+        'left_sheet' : Frame(pygame.image.load(self.IMAGE_FOLDER/'BunnyWalkleft-Sheet.png').convert_alpha())
         }
 
         self.frames_front = [self.sheet['front_sheet'].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]

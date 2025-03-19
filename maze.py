@@ -1,4 +1,5 @@
 from config import Config
+from pathlib import Path
 import random
 import pygame
 
@@ -10,6 +11,8 @@ class Maze:
         self.grid = [[1 for _ in range(cols)] for _ in range(rows)]
         self.generate_maze(1, 1)
         self.add_loops(10)
+        SCRIPT_DIR = Path(__file__).parent
+        self.IMAGE_FOLDER = SCRIPT_DIR / "picture"
 
     def generate_maze(self, x, y):
         self.grid[y][x] = 0
@@ -28,8 +31,8 @@ class Maze:
                 self.grid[y][x] = 0
 
     def draw(self, screen, camera_x, camera_y):
-        black_tile = pygame.image.load("bush_dun.png")  # Load once outside the loop
-        white_tile = pygame.image.load("dirt_dun.png")
+        black_tile = pygame.image.load(self.IMAGE_FOLDER/"bush_dun1.png")  # Load once outside the loop
+        white_tile = pygame.image.load(self.IMAGE_FOLDER/"dirt_dun.png")
         black_tile = pygame.transform.scale(black_tile, (Config.get('bun_size'), Config.get('bun_size')))
         white_tile = pygame.transform.scale(white_tile, (Config.get('bun_size'), Config.get('bun_size')))
 
