@@ -36,18 +36,18 @@ class Bunny:
         self.speed_boost_cooldown_start = 0
 
         # Load sprite sheets
-        self.front_sheet = Frame(pygame.image.load('BunnyWalk-Sheet.png').convert_alpha())
-        self.back_sheet = Frame(pygame.image.load('BunnyWalkBack-Sheet.png').convert_alpha())
-        self.right_sheet = Frame(pygame.image.load('BunnyWalkright-Sheet.png').convert_alpha())
-        self.left_sheet = Frame(pygame.image.load('BunnyWalkleft-Sheet.png').convert_alpha())
-        # self.attack_sheet = Frame(pygame.image.load('BunnyAttack-Sheet.png').convert_alpha())
+        self.sheet = {
+        'front_sheet': Frame(pygame.image.load('BunnyWalk-Sheet.png').convert_alpha()),
+        'back_sheet' : Frame(pygame.image.load('BunnyWalkBack-Sheet.png').convert_alpha()),
+        'right_sheet': Frame(pygame.image.load('BunnyWalkright-Sheet.png').convert_alpha()),
+        'left_sheet' : Frame(pygame.image.load('BunnyWalkleft-Sheet.png').convert_alpha())
+        }
 
-        self.frames_front = [self.front_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
-        self.frames_back = [self.back_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
-        self.frames_right = [self.right_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
-        self.frames_left = [self.left_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
-        # self.frames_attack = [self.attack_sheet.get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(6)]
-
+        self.frames_front = [self.sheet['front_sheet'].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
+        self.frames_back = [self.sheet['back_sheet'].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)]
+        self.frames_right = [self.sheet['right_sheet'].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
+        self.frames_left = [self.sheet['left_sheet'].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)]
+    
         self.current_direction = 'front'
         self.current_frame = 0
         self.frame_time = 60
@@ -189,3 +189,12 @@ class Bunny:
                         self.attacking = False  # Reset attacking state after animation
             
             self.last_update_time = current_time  # Update time
+    
+    # Add to existing class
+    def collect_item(self, item):
+        if item.type == "health":
+            self.heal(20)
+        elif item.type == "speed":
+            self.speed_boost_duration = 10000
+        elif item.type == "damage":
+            self.attack_power = 20

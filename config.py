@@ -16,7 +16,9 @@ class Config:
         'purple':(200,0,210),
         'maze': 50*64,
         # Maze size (50*50 grid)
-        'grid': 50
+        'grid': 50,
+        'yellow':(200,200,0)
+
     }
 
     @classmethod

@@ -28,11 +28,15 @@ class Maze:
                 self.grid[y][x] = 0
 
     def draw(self, screen, camera_x, camera_y):
+        black_tile = pygame.image.load("bush_dun.png")  # Load once outside the loop
+        white_tile = pygame.image.load("dirt_dun.png")
+        black_tile = pygame.transform.scale(black_tile, (Config.get('bun_size'), Config.get('bun_size')))
+        white_tile = pygame.transform.scale(white_tile, (Config.get('bun_size'), Config.get('bun_size')))
+
         for y in range(self.rows):
             for x in range(self.cols):
-                color = Config.get('black') if self.grid[y][x] == 1 else Config.get('white')
-                pygame.draw.rect(screen, color,
-                                 (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y, Config.get('bun_size'), Config.get('bun_size')))
+                tile_image = black_tile if self.grid[y][x] == 1 else white_tile
+                screen.blit(tile_image, (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y))
 
 
 # test
@@ -56,7 +60,7 @@ class Game:
         self.game_over = False
         self.camera_x, self.camera_y = 0, 0
 
-    def get_random_exit(self, min_distance=20):
+    def get_random_exit(self, min_distance=2):
         while True:
             x, y = random.randint(1, Config.get('grid') - 2), random.randint(1, Config.get('grid') - 2)
             if self.maze.grid[y][x] == 0 and abs(x - self.bunny.x) + abs(y - self.bunny.y) >= min_distance:
@@ -98,16 +102,18 @@ class Game:
         
         # Draw the maze
         self.maze.draw(self.screen, self.camera_x, self.camera_y)
+
+        # Draw the begin portal
+        pygame.draw.rect(self.screen, Config.get('purple'), (
+            1* Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')),0)
         
-        # Draw the dungeon (enemies and background)
-        # self.dungeon.draw(self.screen)
         
         # Draw the bunny
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
         
         # Draw the portal
         pygame.draw.rect(self.screen, Config.get('purple'), (
-            self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')), 3)
+            self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')),0)
         
         # Draw the compass
         self.draw_compass()
