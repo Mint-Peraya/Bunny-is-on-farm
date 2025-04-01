@@ -1,6 +1,14 @@
-import pygame, random, sys, math
-from bunny import Bunny
+import pygame
 from config import Config
-from maze import Maze
-from dungeon import Dungeon
+from login import *
+
+class Game:
+    def __init__(self):
+        pygame.init()
+        login = AuthSystem()
+        login.run()
+
+Game()
+        
+
 

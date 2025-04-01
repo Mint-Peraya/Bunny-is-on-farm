@@ -1,10 +1,12 @@
 from config import Config
 from pathlib import Path
-import random
+import random,sys,math
 import pygame
+from bunny import Bunny
 
 class Maze:
     DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+
     def __init__(self, rows, cols):
         self.rows = rows
         self.cols = cols
@@ -30,9 +32,16 @@ class Maze:
             if self.grid[y][x] == 1:
                 self.grid[y][x] = 0
 
+    def get_random_exit(self, min_distance=2):
+        """Generate a random exit position on a walkable tile."""
+        while True:
+            x, y = random.randint(1, self.cols - 2), random.randint(1, self.rows - 2)
+            if self.grid[y][x] == 0:  # Ensure the exit is on a walkable tile
+                return x, y
+
     def draw(self, screen, camera_x, camera_y):
-        black_tile = pygame.image.load(self.IMAGE_FOLDER/"bush_dun1.png")  # Load once outside the loop
-        white_tile = pygame.image.load(self.IMAGE_FOLDER/"dirt_dun.png")
+        black_tile = pygame.image.load(self.IMAGE_FOLDER / "bush_dun1.png")  # Load once outside the loop
+        white_tile = pygame.image.load(self.IMAGE_FOLDER / "dirt_dun.png")
         black_tile = pygame.transform.scale(black_tile, (Config.get('bun_size'), Config.get('bun_size')))
         white_tile = pygame.transform.scale(white_tile, (Config.get('bun_size'), Config.get('bun_size')))
 
@@ -41,10 +50,6 @@ class Maze:
                 tile_image = black_tile if self.grid[y][x] == 1 else white_tile
                 screen.blit(tile_image, (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y))
 
-
-# test
-import sys, math
-from bunny import Bunny
 
 class Game:
     def __init__(self):
@@ -55,19 +60,21 @@ class Game:
         self.reset_game()
 
     def reset_game(self):
-        # Initialize both Maze and Dungeon
+        # Initialize the maze
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
-        # self.dungeon = Dungeon()  # Create a Dungeon instance
-        self.bunny = Bunny(1, 1)
-        self.exit_x, self.exit_y = self.get_random_exit()
+        self.bunny = Bunny(1, 1, mode='maze')
+        self.exit_x, self.exit_y = self.maze.get_random_exit()  # Use Maze's method to get a valid exit
         self.game_over = False
         self.camera_x, self.camera_y = 0, 0
 
-    def get_random_exit(self, min_distance=2):
-        while True:
-            x, y = random.randint(1, Config.get('grid') - 2), random.randint(1, Config.get('grid') - 2)
-            if self.maze.grid[y][x] == 0 and abs(x - self.bunny.x) + abs(y - self.bunny.y) >= min_distance:
-                return x, y
+    def update(self):
+        keys = pygame.key.get_pressed()
+        moving = self.bunny.move(keys, self.maze)
+        self.bunny.update_animation(moving)
+
+        # Update camera position
+        self.camera_x += (self.bunny.x * Config.get('bun_size') - Config.get('wx') // 2 - self.camera_x) * 0.1
+        self.camera_y += (self.bunny.y * Config.get('bun_size') - Config.get('wy') // 2 - self.camera_y) * 0.1
 
     def draw_text(self, text, font_size, color, position):
         font = pygame.font.SysFont(None, font_size)
@@ -90,37 +97,26 @@ class Game:
             elif event.type == pygame.KEYDOWN and not self.game_over and event.key == pygame.K_r:
                 self.reset_game()
 
-    def update(self):
-        keys = pygame.key.get_pressed()
-        moving = self.bunny.move(keys, self.maze)
-        self.bunny.update_animation(moving)
-        
-        
-        # Update camera position
-        self.camera_x += (self.bunny.x * Config.get('bun_size') - Config.get('wx') // 2 - self.camera_x) * 0.1
-        self.camera_y += (self.bunny.y * Config.get('bun_size') - Config.get('wy') // 2 - self.camera_y) * 0.1
-
     def render(self):
         self.screen.fill(Config.get('black'))
-        
+
         # Draw the maze
         self.maze.draw(self.screen, self.camera_x, self.camera_y)
 
         # Draw the begin portal
         pygame.draw.rect(self.screen, Config.get('purple'), (
-            1* Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')),0)
-        
-        
+            1 * Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')), 0)
+
         # Draw the bunny
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
-        
-        # Draw the portal
+
+        # Draw the exit portal
         pygame.draw.rect(self.screen, Config.get('purple'), (
-            self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')),0)
-        
+            self.exit_x * Config.get('bun_size') - self.camera_x, self.exit_y * Config.get('bun_size') - self.camera_y, Config.get('bun_size'), Config.get('bun_size')), 0)
+
         # Draw the compass
         self.draw_compass()
-        
+
         # Check for win condition
         if self.bunny.x == self.exit_x and self.bunny.y == self.exit_y:
             self.game_over = True
@@ -128,10 +124,10 @@ class Game:
             pygame.display.flip()
             pygame.time.wait(2000)
             self.reset_game()
-        
+
         # Display health
         self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
-        
+
         pygame.display.flip()
 
     def run(self):
@@ -143,6 +139,4 @@ class Game:
         pygame.quit()
         sys.exit()
 
-
-if __name__ == "__main__":
-    Game().run()
+Game().run()
