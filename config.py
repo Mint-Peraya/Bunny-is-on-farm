@@ -1,5 +1,4 @@
 import pygame
-from pathlib import Path
 
 class Frame:
     def __init__(self, image):
@@ -14,14 +13,10 @@ class Frame:
     
 # Initialize pygame before loading images
 pygame.init()
-# Define the script directory and image folder
-SCRIPT_DIR = Path(__file__).parent
-IMAGE_FOLDER = SCRIPT_DIR / "picture"
 pygame.display.set_mode((1, 1))
 
 class Config:
     """Configuration class to store game settings and images."""
-
     # Store basic configurations
     __ALL_CONFIGS = {
         'window': (800, 600),
@@ -37,7 +32,10 @@ class Config:
         'purple': (200, 0, 210),
         'maze': 50 * 64,  # Maze size (50x50 grid)
         'grid': 50,
-        'yellow': (200, 200, 0)
+        'yellow': (200, 200, 0),
+        'font':"assets/fonts/pixel.ttf",
+        'FPS': 60,
+        
     }
 
     # Store images separately to prevent premature loading
@@ -47,14 +45,14 @@ class Config:
     def load_images(cls):
         """Load images and store them in the dictionary."""
         cls.__bun_sheet = {
-            'front_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'BunnyWalk-Sheet.png').convert_alpha()),
-            'back_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'BunnyWalkBack-Sheet.png').convert_alpha()),
-            'right_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'BunnyWalkright-Sheet.png').convert_alpha()),
-            'left_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'BunnyWalkleft-Sheet.png').convert_alpha()),
-            'front_damage_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'bunny_front_damage.png').convert_alpha()),
-            'back_damage_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'bunny_back_damage.png').convert_alpha()),
-            'left_damage_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'bunny_left_damage.png').convert_alpha()),
-            'right_damage_sheet': Frame(pygame.image.load(IMAGE_FOLDER / 'bunny_right_damage.png').convert_alpha())
+            'front_sheet': Frame(pygame.image.load('assets/picture/BunnyWalk-Sheet.png').convert_alpha()),
+            'back_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkBack-Sheet.png').convert_alpha()),
+            'right_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkright-Sheet.png').convert_alpha()),
+            'left_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkleft-Sheet.png').convert_alpha()),
+            'front_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_front_damage.png').convert_alpha()),
+            'back_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_back_damage.png').convert_alpha()),
+            'left_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_left_damage.png').convert_alpha()),
+            'right_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_right_damage.png').convert_alpha())
         }
 
     @classmethod
