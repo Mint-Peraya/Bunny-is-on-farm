@@ -1,7 +1,6 @@
 import pygame
-import csv,hashlib
+import csv,hashlib,uuid
 import math,time
-import uuid
 from typing import Tuple
 from dataclasses import dataclass
 from config import Config
@@ -28,7 +27,7 @@ class AuthSystem:
         if not self._initialized:
             self._initialized = True
             self._initialize_system()
-            self.data_file = "Data/users_credentials.csv"
+            self.data_file = "Data/user_credentials.csv"
     
     def _initialize_system(self):
         """Initialize all system components."""
@@ -118,6 +117,8 @@ class AuthSystem:
         self.transition_progress = 1
         self.transition_speed = 0.08
         self.transition_alpha = 0
+
+        self.active_field = None
         
         # Reset input fields
         for field in self.fields.values():
@@ -131,6 +132,25 @@ class AuthSystem:
             with open(self.data_file, 'w', newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow(["user_id", "username", "password_hash"])
+    
+    def _log_login_time(self):
+        """Log the successful login time to login_time.csv."""
+        timestamp = time.strftime("%d-%m-%Y %H:%M:%S")
+        username = self.fields["username"].text
+        data_file = "Data/login_time.csv"
+
+        # Ensure the file has a header if it's new
+        try:
+            with open(data_file, 'x', newline='') as file:
+                writer = csv.writer(file)
+                writer.writerow(["user_id", "username", "timestamp"])
+        except FileExistsError:
+            pass  # File already exists
+
+        # Append the login record
+        with open(data_file, 'a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([self.current_user_id, username, timestamp])
     
     def _hash_password(self, password: str) -> str:
         """Hash a password using SHA-256."""
@@ -186,6 +206,7 @@ class AuthSystem:
             self.message = "Login successful!"
             self.message_color = Config.get('green')
             self.current_user_id = user_id  # Store the logged in user's ID
+            self._log_login_time()  # Log the login time here
             self._start_transition()
         else:
             self.message = "Invalid username or password"
@@ -321,7 +342,7 @@ class AuthSystem:
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 self._handle_mouse_click(event.pos)
             
-            elif event.type == pygame.KEYDOWN:
+            elif event.type == pygame.KEYDOWN and self.active_field is not None:
                 self._handle_key_press(event)
     
     def _handle_mouse_click(self, pos: Tuple[int, int]):
@@ -352,7 +373,7 @@ class AuthSystem:
     
     def _handle_key_press(self, event: pygame.event.Event):
         """Handle keyboard events."""
-        if self.active_field:
+        if self.active_field is not None:
             field = self.fields[self.active_field]
             
             if event.key == pygame.K_RETURN:
@@ -376,6 +397,8 @@ class AuthSystem:
             
             elif event.unicode.isprintable():
                 field.text += event.unicode
+        if self.active_field is None:
+            return
     
     def run(self):
         """Main game loop."""
