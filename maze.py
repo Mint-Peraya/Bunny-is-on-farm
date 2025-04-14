@@ -13,8 +13,11 @@ class Maze:
         self.grid = [[1 for _ in range(cols)] for _ in range(rows)]
         self.generate_maze(1, 1)
         self.add_loops(10)
-        SCRIPT_DIR = Path(__file__).parent
-        self.IMAGE_FOLDER = SCRIPT_DIR / "picture"
+
+        self.bush_tile = pygame.image.load("assets/picture/bush_dun1.png")  # Load once outside the loop
+        self.dirt_tile = pygame.image.load("assets/picture/dirt_dun.png")
+        self.bush_tile = pygame.transform.scale(self.bush_tile, (Config.get('bun_size'), Config.get('bun_size')))
+        self.dirt_tile = pygame.transform.scale(self.dirt_tile, (Config.get('bun_size'), Config.get('bun_size')))
 
     def generate_maze(self, x, y):
         self.grid[y][x] = 0
@@ -40,14 +43,9 @@ class Maze:
                 return x, y
 
     def draw(self, screen, camera_x, camera_y):
-        black_tile = pygame.image.load(self.IMAGE_FOLDER / "bush_dun1.png")  # Load once outside the loop
-        white_tile = pygame.image.load(self.IMAGE_FOLDER / "dirt_dun.png")
-        black_tile = pygame.transform.scale(black_tile, (Config.get('bun_size'), Config.get('bun_size')))
-        white_tile = pygame.transform.scale(white_tile, (Config.get('bun_size'), Config.get('bun_size')))
-
         for y in range(self.rows):
             for x in range(self.cols):
-                tile_image = black_tile if self.grid[y][x] == 1 else white_tile
+                tile_image = self.bush_tile if self.grid[y][x] == 1 else self.dirt_tile
                 screen.blit(tile_image, (x * Config.get('bun_size') - camera_x, y * Config.get('bun_size') - camera_y))
 
 

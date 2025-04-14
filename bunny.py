@@ -1,16 +1,51 @@
 import pygame
 from config import Config
 
-
 class Bunny:
     def __init__(self, x, y, mode="farming"):
-        """Initialize Bunny with a position and default mode."""
         self.x, self.y = x, y
-        self.mode = mode  # Modes: "maze", "farming", "dungeon"
         self.health = 100
         self.attack_power = 10
         self.speed = 0.1
         self.target_x, self.target_y = x, y
+
+        self.current_direction = "front"
+        self.mode = mode  # Modes: "maze", "farming", "dungeon"
+
+        # Animation state
+        self.current_frame = 0
+        self.last_update_time = pygame.time.get_ticks()
+
+        # Status Effects
+        self.attacking = False
+        self.damaged = False
+        self.damage_start_time = 0
+        self.damage_duration = 500  # 0.5 seconds
+        self.attack_cooldown = 0
+
+        # Speed Boost
+        self._init_speed_boost()
+
+        # Load Bunny sprites
+        self.load_bunny()
+
+        # Rect for collision
+        tile_size = Config.get("bun_size")
+        self.rect = pygame.Rect(self.x * tile_size, self.y * tile_size, tile_size, tile_size)
+
+    def load_bunny(self):
+        """Load all sprite sheets."""
+        self.sheet = Config.get("bun_sheet")
+        self.frames = {
+            "front": [self.sheet["front_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(5)],
+            "back": [self.sheet["back_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(5)],
+            "left": [self.sheet["left_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(8)],
+            "right": [self.sheet["right_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(8)],
+            "front_damage": [self.sheet["front_damage_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(5)],
+            "back_damage": [self.sheet["back_damage_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(5)],
+            "left_damage": [self.sheet["left_damage_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(8)],
+            "right_damage": [self.sheet["right_damage_sheet"].get_image(i, 32, 32, 1, (0, 0, 0)) for i in range(8)],
+        }
 
     def switch_mode(self, new_mode):
         """Switch Bunny's mode (maze, farming, dungeon)."""
@@ -55,38 +90,6 @@ class Bunny:
 
                 self.last_update_time = pygame.time.get_ticks()
 
-        # Sprite & Animation
-        self._load_sprites()
-        self.current_direction = "front"
-        self.current_frame = 0
-        self.last_update_time = pygame.time.get_ticks()
-
-        # Status Effects
-        self.attacking = False
-        self.damaged = False
-        self.damage_start_time = 0
-        self.damage_duration = 500  # 0.5 seconds
-
-        # Speed Boost
-        self._init_speed_boost()
-
-        # Rect for collision
-        self.rect = pygame.Rect(self.x, self.y, 64, 64)
-
-    def _load_sprites(self):
-        """Load all sprite sheets."""
-        self.sheet = Config.get("bun_sheet")
-        self.frames = {
-            "front": [self.sheet["front_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)],
-            "back": [self.sheet["back_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)],
-            "left": [self.sheet["left_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)],
-            "right": [self.sheet["right_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)],
-            "front_damage": [self.sheet["front_damage_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)],
-            "back_damage": [self.sheet["back_damage_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(5)],
-            "left_damage": [self.sheet["left_damage_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)],
-            "right_damage": [self.sheet["right_damage_sheet"].get_image(i, 32, 32, 2, (0, 0, 0)) for i in range(8)],
-        }
-
     def _init_speed_boost(self):
         """Initialize speed boost attributes."""
         self.speed_boost_active = False
@@ -100,19 +103,7 @@ class Bunny:
         """Handle Bunny's movement depending on mode."""
         moving = False
         new_direction = self.current_direction
-
-        # Speed boost activation
-        if keys[pygame.K_f] and not self.speed_boost_active and not self.speed_boost_cooldown:
-            self.speed_boost_active = True
-            self.speed_boost_start_time = pygame.time.get_ticks()
-            self.speed *= 1.5
-
-        # Speed boost deactivation
-        if self.speed_boost_active and pygame.time.get_ticks() - self.speed_boost_start_time >= self.speed_boost_duration:
-            self.speed_boost_active = False
-            self.speed = 0.1
-            self.speed_boost_cooldown = True
-            self.speed_boost_cooldown_start = pygame.time.get_ticks()
+        x, y = int(self.x), int(self.y)
 
         # Movement logic
         if keys[pygame.K_LEFT] and maze.grid[self.y][self.x - 1] == 0:
@@ -152,84 +143,3 @@ class Bunny:
             self.current_frame = self.current_frame % len(self.frames[frame_type])
             screen.blit(self.frames[frame_type][self.current_frame],
                         (self.x * Config.get("bun_size") - camera_x, self.y * Config.get("bun_size") - camera_y))
-
-    def collect_item(self, item):
-        """Apply item effects when collected."""
-        self.inventory.add_item(item)
-        item.use(self)
-
-
-class Enemy:
-    def __init__(self, x, y, color, health, attack_interval, attack_damage):
-        self.x, self.y = x, y
-        self.health = health
-        self.rect = pygame.Rect(x, y, 64, 64)
-        self.attack_cooldown = 0
-        self.attack_interval = attack_interval
-        self.attack_damage = attack_damage
-        self.color = color
-        self.path = []
-
-    def take_damage(self, amount):
-        """Reduces enemy health."""
-        self.health = max(self.health - amount, 0)
-
-    def attack(self, target):
-        """Attacks the target if within range and cooldown allows."""
-        current_time = pygame.time.get_ticks()
-        if current_time - self.attack_cooldown > self.attack_interval:
-            self.attack_cooldown = current_time
-            if self.rect.colliderect(target.rect):
-                target.take_damage(self.attack_damage)
-
-    def draw(self, screen):
-        pygame.draw.rect(screen, self.color, self.rect)
-
-    def move_towards(self, target):
-        """Move towards the target."""
-        if self.x < target.x:
-            self.x += 1
-        elif self.x > target.x:
-            self.x -= 1
-        if self.y < target.y:
-            self.y += 1
-        elif self.y > target.y:
-            self.y -= 1
-        self.rect.topleft = (self.x, self.y)
-
-
-class CloseCombatEnemy(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, (255, 0, 0), 50, 1000, 10)
-
-
-class RangedEnemy(Enemy):
-    def __init__(self, x, y):
-        super().__init__(x, y, (0, 0, 255), 50, 2000, 5)
-
-
-class Inventory:
-    def __init__(self):
-        self.items = []
-
-    def add_item(self, item):
-        self.items.append(item)
-
-    def use_item(self, item_index):
-        if item_index < len(self.items):
-            item = self.items.pop(item_index)
-            item.use()
-
-
-class Item:
-    def __init__(self, type, effect):
-        self.type = type
-        self.effect = effect
-
-    def use(self, target):
-        if self.type == "health":
-            target.heal(20)
-        elif self.type == "speed":
-            target.speed_boost_duration = 10000
-        elif self.type == "damage":
-            target.attack_power = 20
