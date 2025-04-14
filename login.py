@@ -6,21 +6,6 @@ from typing import Tuple
 from dataclasses import dataclass
 from config import Config
 
-# Constants
-FPS = 60
-
-# Color palette
-COLORS = {
-    "bg": (234, 232, 205),       # Cream parchment
-    "text": (88, 72, 56),        # Dark brown
-    "active": (113, 179, 113),   # Leaf green
-    "inactive": (181, 172, 156), # Stone gray
-    "button": (242, 191, 96),    # Golden wheat
-    "error": (219, 88, 86),      # Tomato red
-    "success": (106, 168, 79),   # Apple green
-    "transition": (255, 228, 181) # Light orange
-}
-
 @dataclass
 class InputField:
     rect: pygame.Rect
@@ -31,7 +16,6 @@ class InputField:
 
 class AuthSystem:
     """Singleton authentication system with animated UI."""
-    
     _instance = None
     
     def __new__(cls):
@@ -44,7 +28,7 @@ class AuthSystem:
         if not self._initialized:
             self._initialized = True
             self._initialize_system()
-            self.data_file = "Data/user_credentials.csv"
+            self.data_file = "Data/users_credentials.csv"
     
     def _initialize_system(self):
         """Initialize all system components."""
@@ -74,7 +58,6 @@ class AuthSystem:
 
         self._load_eye_icons()
         self._load_background()
-    
 
     def _load_eye_icons(self):
         """Load or create eye icons for password visibility."""
@@ -85,13 +68,12 @@ class AuthSystem:
             self.eye_closed = pygame.transform.scale(self.eye_closed, (30, 20))
         except:
             self.eye_open = pygame.Surface((30, 20), pygame.SRCALPHA)
-            pygame.draw.circle(self.eye_open, (100, 100, 100), (15, 10), 8)
-            pygame.draw.circle(self.eye_open, (50, 50, 150), (15, 10), 5)
-            pygame.draw.circle(self.eye_open, (0, 0, 0), (15, 10), 2)
-            pygame.draw.arc(self.eye_open, (100, 100, 100), (5, 0, 20, 20), 0, math.pi, 2)
+            pygame.draw.circle(self.eye_open, (255, 255, 255), (15, 10), 8)
+            pygame.draw.circle(self.eye_open, (0, 0, 0), (15, 10), 5)
+            pygame.draw.arc(self.eye_open, (0, 0, 0), (5, 0, 20, 20), 0, math.pi, 2)
             
             self.eye_closed = pygame.Surface((30, 20), pygame.SRCALPHA)
-            pygame.draw.line(self.eye_closed, (100, 100, 100), (5, 10), (25, 10), 3)
+            pygame.draw.line(self.eye_closed, (0, 0, 0), (5, 10), (25, 10), 3)
     
     def _load_background(self):
         """Load background image or create a drawn one."""
@@ -107,10 +89,10 @@ class AuthSystem:
         
         self.fields = {
             "username": InputField(
-                rect=pygame.Rect(Config.get('wx')//2 - field_width//2, start_y, field_width, field_height)
+                rect=pygame.Rect(Config.get('wx')//2 - field_width//2, start_y+20, field_width, field_height)
             ),
             "password": InputField(
-                rect=pygame.Rect(Config.get('wx')//2 - field_width//2, start_y + 70, field_width, field_height),
+                rect=pygame.Rect(Config.get('wx')//2 - field_width//2, start_y + 100, field_width, field_height),
                 secret=True
             )
         }
@@ -121,18 +103,18 @@ class AuthSystem:
         
         # Centered submit button
         self.buttons = {
-            "submit": pygame.Rect(Config.get('wx')//2 - button_width//2, start_y + 140, button_width, button_height),
+            "submit": pygame.Rect(Config.get('wx')//2 - button_width//2, start_y + 210, button_width, button_height),
             "toggle_password": pygame.Rect(Config.get('wx')//2 + field_width//2 - 35, start_y + 70, 30, 20)
         }
         
         # Text link for mode toggle (positioned below the button)
-        self.mode_toggle_rect = pygame.Rect(0, start_y + 190, Config.get('wx'), 30)
+        self.mode_toggle_rect = pygame.Rect(0, start_y + 270, Config.get('wx'), 30)
     
     def _reset_state(self):
         """Reset the system state."""
         self.auth_mode = "login"  # "login" or "register"
         self.message = ""
-        self.message_color = COLORS["text"]
+        self.message_color = Config.get('brown')
         self.transition_progress = 1
         self.transition_speed = 0.08
         self.transition_alpha = 0
@@ -196,18 +178,18 @@ class AuthSystem:
         
         if not username or not password:
             self.message = "Please fill in all fields"
-            self.message_color = COLORS["error"]
+            self.message_color = Config.get('red')
             return
         
         success, user_id = self._validate_credentials(username, password)
         if success:
             self.message = "Login successful!"
-            self.message_color = COLORS["success"]
+            self.message_color = Config.get('green')
             self.current_user_id = user_id  # Store the logged in user's ID
             self._start_transition()
         else:
             self.message = "Invalid username or password"
-            self.message_color = COLORS["error"]
+            self.message_color = Config.get('red')
     
     def _handle_register(self):
         """Handle registration attempt."""
@@ -216,23 +198,23 @@ class AuthSystem:
         
         if not username or not password:
             self.message = "Please fill in all fields"
-            self.message_color = COLORS["error"]
+            self.message_color = Config.get('red')
             return
         
         if len(password) < 6:
             self.message = "Password must be at least 6 characters"
-            self.message_color = COLORS["error"]
+            self.message_color = Config.get('red')
             return
         
         success, user_id = self._register_user(username, password)
         if success:
             self.message = "Registration successful! Please login"
-            self.message_color = COLORS["success"]
+            self.message_color = Config.get('green')
             self.auth_mode = "login"
             self.current_user_id = user_id  # Store the new user's ID
         else:
             self.message = "Username already exists"
-            self.message_color = COLORS["error"]
+            self.message_color = Config.get('red')
     
     def _start_transition(self):
         """Start the transition animation."""
@@ -246,31 +228,31 @@ class AuthSystem:
         
         # Draw title
         title = self.fonts["title"].render(
-            "Bunny is on farm", True, COLORS["text"])
+            "Bunny is on farm", True, Config.get('brown'))
         self.screen.blit(title, (Config.get('wx')//2 - title.get_width()//2, 80))
         
         # Draw subtitle (login/register)
         subtitle_text = "Register" if self.auth_mode == "register" else "Login"
         subtitle = self.fonts["subtitle"].render(
-            subtitle_text, True, COLORS["text"])
+            subtitle_text, True, Config.get('brown'))
         self.screen.blit(subtitle, (Config.get('wx')//2 - subtitle.get_width()//2, 140))
         
         # Draw input fields
         self._draw_input_fields()
         
         # Draw submit button (centered)
-        pygame.draw.rect(self.screen, COLORS["button"], self.buttons["submit"], 0, 5)
-        pygame.draw.rect(self.screen, COLORS["text"], self.buttons["submit"], 2, 5)
+        pygame.draw.rect(self.screen, Config.get('purple'), self.buttons["submit"], 0, 5)
+        pygame.draw.rect(self.screen, Config.get('brown'), self.buttons["submit"], 2, 5)
         
         submit_text = "Register" if self.auth_mode == "register" else "Login"
-        text_surface = self.fonts["button"].render(submit_text, True, COLORS["text"])
+        text_surface = self.fonts["button"].render(submit_text, True, Config.get('brown'))
         self.screen.blit(text_surface, 
                         (self.buttons["submit"].centerx - text_surface.get_width()//2,
                          self.buttons["submit"].centery - text_surface.get_height()//2))
         
         # Draw mode toggle text (below the button)
         toggle_text = "Already have an account? Login" if self.auth_mode == "register" else "Don't have an account? Register"
-        text_surface = self.fonts["message"].render(toggle_text, True, COLORS["text"])
+        text_surface = self.fonts["message"].render(toggle_text, True, Config.get('brown'))
         text_rect = text_surface.get_rect(center=(Config.get('wx')//2, self.buttons["submit"].bottom + 25))
         self.screen.blit(text_surface, text_rect)
         
@@ -285,7 +267,7 @@ class AuthSystem:
         if self.transition_progress < 1:
             overlay = pygame.Surface(Config.get('window'), pygame.SRCALPHA)
             radius = int(self.transition_progress * (Config.get('wx') * 1.5))
-            pygame.draw.circle(overlay, (*COLORS["transition"], self.transition_alpha), 
+            pygame.draw.circle(overlay, (*Config.get('brown'), self.transition_alpha), 
                              (Config.get('wx')//2, Config.get('wy')//2), radius)
             self.screen.blit(overlay, (0, 0))
     
@@ -294,13 +276,13 @@ class AuthSystem:
         """Draw all input fields."""
         for name, field in self.fields.items():
             # Field background
-            color = COLORS["active"] if field.active else COLORS["inactive"]
+            color = Config.get('peach') if field.active else Config.get('sky')
             pygame.draw.rect(self.screen, color, field.rect, 0, 5)
-            pygame.draw.rect(self.screen, COLORS["text"], field.rect, 2, 5)
+            pygame.draw.rect(self.screen, Config.get('brown'), field.rect, 2, 5)
             
             # Field label
             label = self.fonts["field"].render(
-                name.replace("_", " ").title() + ":", True, COLORS["text"])
+                name.replace("_", " ").title() + ":", True, Config.get('brown'))
             self.screen.blit(label, (field.rect.left, field.rect.top - 25))
             
             # Field text
@@ -308,7 +290,7 @@ class AuthSystem:
             if field.secret and not field.visible:
                 text = "*" * len(text)
             
-            text_surface = self.fonts["field"].render(text, True, COLORS["text"])
+            text_surface = self.fonts["field"].render(text, True, Config.get('brown'))
             text_rect = text_surface.get_rect(
                 midleft=(field.rect.left + 10, field.rect.centery))
             
@@ -402,7 +384,7 @@ class AuthSystem:
             self._draw_ui()
             
             pygame.display.flip()
-            self.clock.tick(FPS)
+            self.clock.tick(Config.get('FPS'))
             
             # Check if transition is complete
             if self.transition_progress >= 1 and self.message == "Login successful!":

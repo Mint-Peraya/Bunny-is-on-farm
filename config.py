@@ -22,6 +22,7 @@ class Config:
         'window': (800, 600),
         'wx': 800,
         'wy': 600,
+        'FPS': 60,
         'bun_size': 64,
         'black': (0, 0, 0),
         'white': (255, 255, 255),
@@ -30,12 +31,13 @@ class Config:
         'peach': (255, 200, 200),
         'sky': (200, 255, 255),
         'purple': (200, 0, 210),
+        'brown': (60,5,25),
         'maze': 50 * 64,  # Maze size (50x50 grid)
         'grid': 50,
         'yellow': (200, 200, 0),
         'font':"assets/fonts/pixel.ttf",
         'FPS': 60,
-        
+
     }
 
     # Store images separately to prevent premature loading
@@ -64,3 +66,4 @@ class Config:
 
 # Load images once before the game starts
 Config.load_images()
+
