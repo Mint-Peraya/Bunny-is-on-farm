@@ -3,7 +3,7 @@ import random,math
 from config import Config
 from bunny import Bunny
 
-class PVPSpace:
+class PVESpace:
     def __init__(self):
         self.grid_size = 20  # 20x20 grid
         self.enemies = [Enemy(random.randint(0, 19)*64, random.randint(0, 19)*64) for _ in range(5)]
