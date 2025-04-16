@@ -18,3 +18,4 @@ Python 3.8 or higher
 Key	Action
 Arrow Keys	Move the bunny
 SPACE	Interact
+i Open full inventory
