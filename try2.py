@@ -6,6 +6,8 @@ class Tile:
     def __init__(self, tile_type='dirt'):
         self.type = tile_type
         self.dug = False
+        self.tile_x = 0  # Will be set when placed in farm
+        self.tile_y = 0  # Will be set when placed in farm
 
     def dig(self):
         if self.type == 'dirt':
@@ -48,16 +50,19 @@ class Farm:
         # Protect a small 5x5 area around (1,1)
         return {(hx, hy) for hx in range(0, 5) for hy in range(0, 5)}
 
+    # In Farm.draw() - optimize rendering
     def draw(self, screen, camera_x, camera_y):
         size = Config.get('bun_size')
-        for y in range(self.height):
-            for x in range(self.width):
+        start_x = max(0, int(camera_x // size))
+        end_x = min(self.width, int((camera_x + Config.get('wx')) // size + 1))
+        start_y = max(0, int(camera_y // size))
+        end_y = min(self.height, int((camera_y + Config.get('wy')) // size + 1))
+        
+        for y in range(start_y, end_y):
+            for x in range(start_x, end_x):
                 screen_x = x * size - camera_x
                 screen_y = y * size - camera_y
-
-                # Only draw visible tiles
-                if -size < screen_x < Config.get('wx') and -size < screen_y < Config.get('wy'):
-                    self.tiles[y][x].draw(screen, screen_x, screen_y)
+                self.tiles[y][x].draw(screen, screen_x, screen_y)
 
     def dig_tile_at(self, tile_x, tile_y):
         if 0 <= tile_x < self.width and 0 <= tile_y < self.height:
