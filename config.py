@@ -67,7 +67,8 @@ class Config:
         "stone": ResourceItem("stone", "assets/items/stone.png"),
         "carrot": ResourceItem("carrot", "assets/items/carrot.png"),
         "axe": ResourceItem("axe", "assets/items/axe.png"),
-        "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png")
+        "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
+        "seed": ResourceItem("seed", "assets/items/seed.png")
     }
 
     # Store images separately to prevent premature loading

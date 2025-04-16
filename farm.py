@@ -12,6 +12,22 @@ class Tile:
         self.health = 10 if tile_type in ('tree', 'stone') else 0
         self.max_health = 10 if tile_type in ('tree', 'stone') else 0
         self.interactables = []
+        self.plant = None
+        self.watered = False
+        self.last_watered = 0
+
+    def water(self):
+        self.watered = True
+        self.last_watered = pygame.time.get_ticks()
+    
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+
 
     def dig(self):
         if self.type == 'dirt':
@@ -46,6 +62,14 @@ class Tile:
             health_percent = self.health / self.max_health
             pygame.draw.rect(screen, (255, 0, 0), (x + 5, y + 5, bar_width, bar_height))
             pygame.draw.rect(screen, (0, 255, 0), (x + 5, y + 5, int(bar_width * health_percent), bar_height))
+        if self.watered:
+            water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
+            water_overlay.fill((0, 100, 255, 60))
+            screen.blit(water_overlay, (x, y))
+
+    def update(self):
+        if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:  # 10 sec
+            self.watered = False
 
 class Farm:
     def __init__(self, game, width=50, height=30):
@@ -93,3 +117,23 @@ class Farm:
         for obj in self.interactables:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
+        
+
+
+class Plant:
+    def __init__(self, growth_stages, grow_time=300):
+        self.growth_stages = growth_stages  # list of images or colors
+        self.grow_time = grow_time  # ms per stage
+        self.stage = 0
+        self.planted_time = pygame.time.get_ticks()
+
+    def update(self):
+        now = pygame.time.get_ticks()
+        if self.stage < len(self.growth_stages) - 1:
+            if now - self.planted_time > self.grow_time:
+                self.stage += 1
+                self.planted_time = now
+
+    def draw(self, screen, x, y, tile_size):
+        color = self.growth_stages[self.stage]
+        pygame.draw.rect(screen, color, (x, y, tile_size, tile_size))

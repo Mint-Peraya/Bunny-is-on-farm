@@ -70,3 +70,8 @@ class Maze:
         arrow_end_x = compass_x + (compass_radius - 10) * math.cos(angle)
         arrow_end_y = compass_y + (compass_radius - 10) * math.sin(angle)
         pygame.draw.line(screen, Config.get('red'), (compass_x, compass_y), (arrow_end_x, arrow_end_y), 3)
+
+    def update(self):
+        for obj in self.interactables:
+            if hasattr(obj, "update"):
+                obj.update()

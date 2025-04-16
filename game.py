@@ -41,6 +41,8 @@ class Game:
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
         
+        self.bunny.update_action()
+        
         # Update world state
         world.update()
         
@@ -67,6 +69,19 @@ class Game:
                 self.bunny.start_action('cut', tile)
             elif tile.type == 'stone':
                 self.bunny.start_action('mine', tile)
+            elif tile.type == 'dirt':
+                if not tile.dug:
+                    self.bunny.start_action('dig', tile)
+                elif tile.dug and tile.plant is None and self.bunny.held_item == 'seed':
+                    if self.bunny.inventory.items["seed"] > 0:
+                        stages = [Config.get('red'),Config.get('green'),Config.get('blue')]
+                        tile.plant = Plant(stages)
+                        self.bunny.inventory.items["seed"] -= 1
+                        self.bunny.inventory.show_notification("Planted a seed!", (0, 255, 0))
+                elif tile.dug and self.bunny.held_item != 'seed':
+                    tile.water()
+                    self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
+
         
         # Check for portal interactions
         portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
@@ -87,17 +102,17 @@ class Game:
             pygame.time.delay(30)
 
     def warp_to_maze(self):
-        """Transition from farm to maze"""
         self.fade_transition()
         self.bunny.mode = 'maze'
-        self.teleport_bunny(world=self.maze)
+        self.teleport_bunny(self.maze, self.farm_portal.target_pos)
         self.game_over = False
 
     def warp_to_farm(self):
-        """Transition from maze to farm"""
         self.fade_transition()
         self.bunny.mode = 'farm'
-        self.teleport_bunny(world=self.farm)
+        # Use target_pos from whichever portal was used
+        source = self.maze_enterportal if self.bunny.x == self.maze_enterportal.tile_x else self.maze_exitportal
+        self.teleport_bunny(self.farm, source.target_pos)
         self.game_over = False
 
     def render_ui(self):
@@ -160,6 +175,14 @@ class Game:
                     elif self.bunny.mode =='maze':
                         self.bunny.can_interact_with(self.maze.interactables, self)
 
+                elif pygame.K_1 <= event.key <= pygame.K_5:
+                    index = event.key - pygame.K_1
+                    item_list = list(self.bunny.inventory.items.keys())
+                    if index < len(item_list):
+                        self.bunny.held_item = item_list[index]
+                        self.bunny.inventory.show_notification(f"Holding: {self.bunny.held_item}", (255, 255, 100))
+
+
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""
         font = pygame.font.Font(Config.get('font'), font_size)
@@ -183,18 +206,14 @@ class Game:
             self.draw_text("You Win!", 55, Config.get('green'),
                           (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
 
-    def teleport_bunny(self, world):
-        if world == 'maze' and self.bunny.can_move_to(1, 1, world):
-            self.bunny.x = self.bunny.target_x = 1
-            self.bunny.y = self.bunny.target_y = 1
+    def teleport_bunny(self, world, target_pos):
+        tx, ty = target_pos
+        if self.bunny.can_move_to(tx, ty, world):
+            self.bunny.x = self.bunny.target_x = tx
+            self.bunny.y = self.bunny.target_y = ty
             self.update_camera(instant=True)
             return True
-        if world == 'farm' and self.bunny.can_move_to(self.farm.width - 2, self.farm.height - 2, world):
-            self.bunny.x = self.bunny.target_x = self.farm.width - 2
-            self.bunny.y = self.bunny.target_y = self.farm.height - 2
-            self.update_camera(instant=True)
-            return True
-
+        return False
 
     def render(self):
         """Main render method"""

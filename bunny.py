@@ -1,5 +1,5 @@
 import pygame
-import math
+import math,random
 from config import *
 from collections import defaultdict
 
@@ -21,6 +21,8 @@ class Inventory:
             self.show_notification(f"Picked up {item.name}", (0, 255, 0))
             return True
         self.show_notification("Inventory Full!", (255, 0, 0))
+        if self.items[item.name] <= 0:
+            del self.items[item.name]
         return False
 
     def draw(self, screen):
@@ -100,6 +102,7 @@ class Bunny:
         self.health = 100
         self.speed = 0.1
         self.target_x, self.target_y = x, y
+        self.held_item = None  # Name of the held item, e.g., 'seed'
 
         self.current_direction = 'front'
         self.mode = mode
@@ -130,6 +133,8 @@ class Bunny:
         self.current_tool = None
         self.action_progress = 0  # 0-100%
         self.action_target = None  # Tile being worked on
+        self.last_interacted = None
+
 
     def start_action(self, action_type, target_tile):
         """Start an action with progress tracking"""
@@ -144,6 +149,8 @@ class Bunny:
         elif action_type == 'mine':
             tool_level = self.tools['pickaxe']['level']
             self.action_speed = 1.0 / tool_level
+        elif action_type == 'dig':
+            self.action_speed = 1.0  # Default speed for digging
 
     def update_action(self):
         """Update action progress if performing one"""
@@ -156,16 +163,24 @@ class Bunny:
         """Finish the current action"""
         if self.current_action == 'cut' and self.action_target.type == 'tree':
             self.add_to_inventory('wood')
-            # Instead of replacing with dirt, just make it a "stump"
             self.action_target.type = 'stump'
             self.action_target.health = 0
+
+            # 🎲 Add chance to drop a seed
+            if random.random() < 0.5:  # 30% chance
+                self.add_to_inventory('seed')
+                self.inventory.show_notification("You got a seed!", (200, 255, 100))
+
         elif self.current_action == 'mine' and self.action_target.type == 'stone':
             self.add_to_inventory('stone')
-            self.action_target.type = 'dirt'  # Stones can be fully removed
-            
+            self.action_target.type = 'dirt'
+        elif self.current_action == 'dig' and self.action_target.type == 'dirt':
+            self.action_target.dig()
+
         self.current_action = None
         self.action_target = None
         self.action_progress = 0
+
 
     def load_bunny(self):
         self.sheet = Config.get("bun_sheet")
@@ -274,7 +289,6 @@ class Bunny:
                 (self.x * Config.get('bun_size') - camera_x,
                  self.y * Config.get('bun_size') - camera_y)
             )
-        self.draw_health_bar(screen, camera_x, camera_y)
         self.inventory.draw(screen)
         # Draw action progress if performing one
         if self.current_action and self.action_target:
@@ -286,15 +300,21 @@ class Bunny:
             pygame.draw.rect(screen, (100, 100, 100), (x, y, bar_width, bar_height))
             pygame.draw.rect(screen, (0, 200, 200), (x, y, int(bar_width * (self.action_progress / 100)), bar_height))
 
+        # Draw status text
+        if self.current_action:
+            font = pygame.font.Font(None, 24)
+            status = f"{self.current_action.capitalize()}..."
+            text_surface = font.render(status, True, (255, 255, 255))
+            screen.blit(text_surface, (
+                self.x * Config.get('bun_size') - camera_x,
+                self.y * Config.get('bun_size') - camera_y - 40
+            ))
 
-    def draw_health_bar(self, screen, camera_x, camera_y):
-        bar_width = 50
-        bar_height = 5
-        x = self.x * Config.get('bun_size') - camera_x + (Config.get('bun_size') - bar_width) // 2
-        y = self.y * Config.get('bun_size') - camera_y - 10
+        if self.held_item:
+            font = pygame.font.Font(None, 24)
+            text = f"Holding: {self.held_item}"
+            screen.blit(font.render(text, True, (255, 255, 255)), (10, 120))
 
-        pygame.draw.rect(screen, (255, 0, 0), (x, y, bar_width, bar_height))
-        pygame.draw.rect(screen, (0, 255, 0), (x, y, bar_width * (self.health / 100), bar_height))
 
     def switch_mode(self):
         self.mode = 'maze' if self.mode == 'farm' else 'farm'
@@ -324,10 +344,15 @@ class Bunny:
     
     def can_interact_with(self, objects, world):
         for obj in objects:
-            if self.can_interact_with(obj,world):
+            if self.is_near(obj):
                 obj.interact(world)
                 self.last_interacted = obj
                 break
+
+    def is_near(self, obj):
+        dx = self.x - obj.x
+        dy = self.y - obj.y
+        return math.hypot(dx, dy) <= self.interact_range
 
     def add_to_inventory(self, item_name, amount=1):
         for _ in range(amount):

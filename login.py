@@ -1,6 +1,6 @@
 import pygame
 import csv,hashlib,uuid
-import math,time
+import math,time,sys
 from typing import Tuple
 from dataclasses import dataclass
 from config import Config
@@ -207,7 +207,8 @@ class AuthSystem:
             self.message_color = Config.get('green')
             self.current_user_id = user_id  # Store the logged in user's ID
             self._log_login_time()  # Log the login time here
-            self._start_transition()
+            # self._start_transition()
+            self.running = False
         else:
             self.message = "Invalid username or password"
             self.message_color = Config.get('red')
@@ -413,11 +414,4 @@ class AuthSystem:
             if self.transition_progress >= 1 and self.message == "Login successful!":
                 time.sleep(1)  # Show success message briefly
                 self.running = False
-        
-        pygame.quit()
         return self.current_user_id  # Return the user ID when done
-
-if __name__ == "__main__":
-    auth = AuthSystem()
-    user_id = auth.run()
-    print(f"Logged in with user ID: {user_id}")  # You can use this ID to save game data

@@ -10,6 +10,14 @@ class Stone:
         self.image = pygame.image.load(image_path).convert_alpha()
         self.rect = self.image.get_rect(topleft=(tile_x * 32, tile_y * 32))
 
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+
     def interact(self, game):
         self.health -= 1
         print("You hit the stone! HP:", self.health)
@@ -31,6 +39,14 @@ class Tree:
         self.image = pygame.image.load(image_path).convert_alpha()
         self.rect = self.image.get_rect(topleft=(tile_x * 32, tile_y * 32))
 
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+    
     def interact(self, game):
         self.health -= 1
         print("You chopped the tree! HP:", self.health)
@@ -55,6 +71,14 @@ class Portal:
         self.interact_text = "Enter portal (SPACE)"
         self.cooldown = 0  # Added cooldown timer
 
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+    
     def draw_interaction(self, screen):
         """Draw interaction prompt"""
         if self.interact_text:
@@ -97,8 +121,13 @@ class Portal:
                 game.warp_to_maze()
             else:
                 game.warp_to_farm()
-            self.cooldown = 30  # 0.5 second cooldown at 60 FPS
-    
+            self.cooldown = 30
+
     def update(self):
         if self.cooldown > 0:
             self.cooldown -= 1
+
+    def interact(self, game):
+        self.teleport(game)
+
+
