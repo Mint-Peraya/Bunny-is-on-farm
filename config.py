@@ -15,6 +15,24 @@ class Frame:
 pygame.init()
 pygame.display.set_mode((1, 1))
 
+class ResourceItem:
+    def __init__(self, name, image_path):
+        self.name = name
+        try:
+            self.image = pygame.image.load(image_path).convert_alpha()
+        except:
+            self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
+            self.image.fill((50, 50, 50, 255))  # dark gray background
+
+            # Render the name on the fallback surface
+            font = pygame.font.SysFont("arial", 10, bold=True)
+            text_surface = font.render(self.name, True, (255, 255, 255))  # white text
+
+            # Center the text
+            text_rect = text_surface.get_rect(center=(16, 16))
+            self.image.blit(text_surface, text_rect)
+
+
 class Config:
     """Configuration class to store game settings and images."""
     # Store basic configurations
@@ -41,6 +59,12 @@ class Config:
         'font':"assets/fonts/pixel.ttf",
         'FPS': 60,
 
+    }
+
+    RESOURCE_ITEMS = {
+        "wood": ResourceItem("wood", "assets/items/wood.png"),
+        "stone": ResourceItem("stone", "assets/items/stone.png"),
+        "carrot": ResourceItem("carrot", "assets/items/carrot.png")
     }
 
     # Store images separately to prevent premature loading
@@ -138,8 +162,3 @@ class BigScene:
             lines.append(current_line)
         return lines
 
-
-# story = "  A long time ago, in a peaceful valley far away, you inherited a piece of land where your new farming journey begins."
-
-# s = BigScene(pygame.display.set_mode((800, 600)),pygame.time.Clock(),story,Config.get('font'),32)
-# s.run()

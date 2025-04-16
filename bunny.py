@@ -1,47 +1,97 @@
 import pygame
 import math
 from config import *
+from collections import defaultdict
+
 
 class Inventory:
     def __init__(self, capacity=5):
         self.capacity = capacity
-        self.items = []
+        self.items = defaultdict(int)  # {item_name: count}
         self.notification = None
         self.notification_time = 0
+        self.full_view = False  # For toggling full inventory screen
 
     def is_full(self):
-        return len(self.items) >= self.capacity
+        return sum(self.items.values()) >= self.capacity
 
     def add_item(self, item):
-        if not self.is_full():
-            self.items.append(item)
+        if not self.is_full() or item.name in self.items:
+            self.items[item.name] += 1
             self.show_notification(f"Picked up {item.name}", (0, 255, 0))
             return True
         self.show_notification("Inventory Full!", (255, 0, 0))
         return False
 
     def draw(self, screen):
+        if self.full_view:
+            self.draw_full_inventory(screen)
+        else:
+            self.draw_quick_bar(screen)
+
+    def draw_quick_bar(self, screen):
         slot_size = 64
         padding = 10
         start_x = (screen.get_width() - (slot_size + padding) * self.capacity) // 2
         y = screen.get_height() - slot_size - 10
 
+        item_list = list(self.items.items())
         for i in range(self.capacity):
             rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
             pygame.draw.rect(screen, (200, 200, 200), rect, 2)
-            if i < len(self.items):
-                img = pygame.transform.scale(self.items[i].image, (slot_size - 10, slot_size - 10))
+            if i < len(item_list):
+                name, count = item_list[i]
+                item = Config.RESOURCE_ITEMS[name]
+                img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
                 screen.blit(img, (rect.x + 5, rect.y + 5))
+                font = pygame.font.SysFont(None, 22)
+                count_surface = font.render(str(count), True, (255, 255, 255))
+                screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
 
-        # Draw notification
         if self.notification and pygame.time.get_ticks() - self.notification_time < 2000:
             notif_img, _ = self.notification
             screen.blit(notif_img, (20, 20))
+
+    def draw_full_inventory(self, screen):
+        width = 600
+        height = 300
+        box = pygame.Rect((screen.get_width() - width) // 2, (screen.get_height() - height) // 2, width, height)
+        pygame.draw.rect(screen, (50, 50, 50), box)
+        pygame.draw.rect(screen, (200, 200, 200), box, 4)
+
+        font = pygame.font.SysFont(None, 28)
+        title = font.render("Inventory", True, (255, 255, 255))
+        screen.blit(title, (box.x + 20, box.y + 10))
+
+        slot_size = 50
+        padding = 10
+        cols = 6
+        start_x = box.x + 20
+        start_y = box.y + 50
+
+        item_list = list(self.items.items())
+        for i, (name, count) in enumerate(item_list):
+            item = Config.RESOURCE_ITEMS[name]
+            row = i // cols
+            col = i % cols
+            x = start_x + col * (slot_size + padding)
+            y = start_y + row * (slot_size + padding)
+
+            rect = pygame.Rect(x, y, slot_size, slot_size)
+            pygame.draw.rect(screen, (180, 180, 180), rect, 2)
+            img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+            screen.blit(img, (x + 5, y + 5))
+
+            count_surf = font.render(str(count), True, (255, 255, 255))
+            screen.blit(count_surf, (x + slot_size - 20, y + slot_size - 20))
 
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
         self.notification = (font.render(text, True, color), pygame.time.get_ticks())
         self.notification_time = pygame.time.get_ticks()
+
+    def toggle_inventory_view(self):
+        self.full_view = not self.full_view
 
 
 class Bunny:
@@ -68,14 +118,18 @@ class Bunny:
 
         self.load_bunny()
 
-        self.inventory_data = {
-            'wood': 0,
-            'stone': 0,
-            'carrot': 0
-        }
         self.inventory = Inventory()
         self.interact_range = 1.5
         self.current_interactable = None
+        self.action_time = 0  # Countdown timer in frames
+        self.current_action = None  # e.g., 'cut', 'mine', 'dig'
+
+    def start_action(self, action_type):
+        if self.action_time == 0:
+            self.current_action = action_type
+            self.action_time = 60  # Takes 1 second if your FPS is 60
+
+
 
     def load_bunny(self):
         self.sheet = Config.get("bun_sheet")
@@ -89,9 +143,8 @@ class Bunny:
             "left_damage": [self.sheet["left_damage_sheet"].get_image(i, Config.get("bun_exact"), Config.get("bun_exact"), 2, (0, 0, 0)) for i in range(8)],
             "right_damage": [self.sheet["right_damage_sheet"].get_image(i, Config.get("bun_exact"), Config.get("bun_exact"), 2, (0, 0, 0)) for i in range(8)],
         }
-    
+
     def move(self, keys, world):
-        """Update bunny's position based on key presses and world collision."""
         moving = False
         new_direction = self.current_direction
 
@@ -140,25 +193,18 @@ class Bunny:
         )
         return moving
 
-
     def can_move_to(self, x, y, world):
-        """Check if position is valid in current world mode."""
         if self.mode == 'maze':
-            # Maze movement rules
             return (0 <= x < Config.get('grid') and 
                     0 <= y < Config.get('grid') and 
                     world.grid[y][x] == 0)
         else:
-            # Farm movement rules (can't move through trees/stones)
             return (0 <= x < world.width and 
                     0 <= y < world.height and 
                     world.tiles[y][x].type not in ('tree', 'stone'))
 
-
     def update_animation(self, moving):
-        """Update the animation frame if moving or attacking."""
         current_time = pygame.time.get_ticks()
-        
         if (moving or self.attacking) and current_time - self.last_update_time > self.frame_time:
             if self.current_direction in self.frames:
                 frames = self.frames[self.current_direction]
@@ -168,17 +214,14 @@ class Bunny:
                         self.attacking = False
             self.last_update_time = current_time
 
-
     def attack(self, enemies):
-        """Attack enemies in range."""
         current_time = pygame.time.get_ticks()
-        if current_time - self.attack_cooldown > 500:  # 500 ms cooldown
+        if current_time - self.attack_cooldown > 500:
             self.attacking = True
             self.attack_cooldown = current_time
             for enemy in enemies:
                 if self.rect.colliderect(enemy.rect):
                     enemy.take_damage(10)
-
 
     def take_damage(self, amount):
         self.health = max(0, self.health - amount)
@@ -222,8 +265,12 @@ class Bunny:
                 break
 
     def can_interact_with(self, obj):
-        """Check if bunny is close enough to interact with an object"""
         if hasattr(obj, 'tile_x') and hasattr(obj, 'tile_y'):
             distance = math.sqrt((self.x - obj.tile_x)**2 + (self.y - obj.tile_y)**2)
             return distance <= self.interact_range
         return False
+
+    def add_to_inventory(self, item_name, amount=1):
+        for _ in range(amount):
+            if item_name in Config.RESOURCE_ITEMS:
+                self.inventory.add_item(Config.RESOURCE_ITEMS[item_name])

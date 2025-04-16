@@ -87,15 +87,7 @@ class Game:
         
         # Check for nearby interactables
         self.bunny.current_interactable = None
-        portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
-        
-        for portal in portals:
-            if self.bunny.can_interact_with(portal):
-                self.bunny.current_interactable = portal
-                if keys[pygame.K_SPACE]:
-                    portal.teleport(self)
-
-        # Check for nearby resources in farm mode
+        # First: Check for nearby resources
         if self.bunny.mode == 'farm':
             tile_x, tile_y = int(self.bunny.x), int(self.bunny.y)
             for dy in range(-1, 2):
@@ -108,10 +100,37 @@ class Game:
                             self.bunny.current_interactable = tile
                             if keys[pygame.K_SPACE]:
                                 self.handle_resource_interaction(check_x, check_y)
-        
+                            break  # Prioritize first resource found
+
+        # Then: Check for portals
+        portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
+
+        for portal in portals:
+            if self.bunny.can_interact_with(portal):
+                # Only override if nothing else to interact with
+                if self.bunny.current_interactable is None:
+                    self.bunny.current_interactable = portal
+                if keys[pygame.K_SPACE]:
+                    portal.teleport(self)
+                    self.portal_cooldown = 30
+
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
-        self.update_camera()
+        self.update_camera()  # ✅ Always follow bunny!
+
+        tile_x, tile_y = round(self.bunny.x), round(self.bunny.y)
+        for dy in range(-1, 2):
+            for dx in range(-1, 2):
+                check_x, check_y = tile_x + dx, tile_y + dy
+                if (0 <= check_x < self.farm.width and 0 <= check_y < self.farm.height):
+                    tile = self.farm.tiles[check_y][check_x]
+                    if tile.type in ('tree', 'stone'):
+                        print(f"✅ Found {tile.type} at {check_x},{check_y}")
+                        self.bunny.current_interactable = tile
+                        if keys[pygame.K_SPACE]:
+                            self.handle_resource_interaction(check_x, check_y)
+                        break
+
 
     def handle_resource_interaction(self, x, y):
         """Handle gathering resources from farm tiles"""
