@@ -2,6 +2,32 @@ import pygame
 from config import Config
 from login import *
 from maze import *
+from try2 import *
+
+class Portal:
+    def __init__(self, tile_x, tile_y):
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+
+    def draw(self, screen, camera_x, camera_y):
+        tile_size = Config.get('bun_size')
+        center_x = self.tile_x * tile_size + tile_size // 2 - camera_x
+        center_y = self.tile_y * tile_size + tile_size // 2 - camera_y
+        base_radius = tile_size // 2 - 8
+
+        time = pygame.time.get_ticks() / 300
+        pulse = math.sin(time) * 3
+
+        for i in range(3):
+            aura_radius = base_radius + 6 + i * 4 + pulse
+            alpha = 50 - i * 15
+            aura_surf = pygame.Surface((aura_radius * 2, aura_radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(aura_surf, (*Config.get('dark_purple'), alpha),
+                               (aura_radius, aura_radius), int(aura_radius))
+            screen.blit(aura_surf, (center_x - aura_radius, center_y - aura_radius))
+
+        pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
+
 
 class Game:
     def __init__(self):
@@ -12,10 +38,12 @@ class Game:
         self.reset_game()
 
     def reset_game(self):
-        # Initialize the maze
+        self.farm = Farm(5000,3000)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.bunny = Bunny(1, 1, mode='maze')
-        self.exit_x, self.exit_y = self.maze.get_random_exit()  # Use Maze's method to get a valid exit
+        self.exit = self.maze.get_random_exit()
+        self.start_portal = Portal(1, 1)
+        self.exit_portal = Portal(self.exit[0], self.exit[1])
         self.game_over = False
         self.camera_x, self.camera_y = 0, 0
 
@@ -24,7 +52,6 @@ class Game:
         moving = self.bunny.move(keys, self.maze)
         self.bunny.update_animation(moving)
 
-        # Update camera position
         self.camera_x += (self.bunny.x * Config.get('bun_size') - Config.get('wx') // 2 - self.camera_x) * 0.1
         self.camera_y += (self.bunny.y * Config.get('bun_size') - Config.get('wy') // 2 - self.camera_y) * 0.1
 
@@ -32,18 +59,6 @@ class Game:
         font = pygame.font.Font(Config.get('font'), font_size)
         text_surface = font.render(text, True, color)
         self.screen.blit(text_surface, position)
-
-    def draw_compass(self):
-        dx, dy = self.exit_x - int(self.bunny.x), self.exit_y - int(self.bunny.y)
-        if dx == 0 and dy == 0:
-            angle = 0
-        else:
-            angle = math.atan2(dy, dx)
-        compass_x, compass_y, compass_radius = Config.get('wx') - 100, 50, 40
-        pygame.draw.circle(self.screen, Config.get('white'), (compass_x, compass_y), compass_radius, 2)
-        arrow_end_x = compass_x + (compass_radius - 10) * math.cos(angle)
-        arrow_end_y = compass_y + (compass_radius - 10) * math.sin(angle)
-        pygame.draw.line(self.screen, Config.get('red'), (compass_x, compass_y), (arrow_end_x, arrow_end_y), 3)
 
     def handle_events(self):
         for event in pygame.event.get():
@@ -55,56 +70,68 @@ class Game:
     def render(self):
         self.screen.fill(Config.get('black'))
 
-        # Draw the maze
+        # Draw farm first as background
+        self.farm.draw(self.screen, self.camera_x, self.camera_y)
+
+        # Allow digging
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            self.farm.dig_tile_at(int(self.bunny.x), int(self.bunny.y))
+
+        # Then maze on top of farm
         self.maze.draw(self.screen, self.camera_x, self.camera_y)
 
-        # Draw the begin portal
-        pygame.draw.rect(self.screen, Config.get('purple'), (
-            1 * Config.get('bun_size') - self.camera_x, 1 * Config.get('bun_size') - self.camera_y, 
-            Config.get('bun_size'), Config.get('bun_size')), 0)
+        # Draw portals
+        self.start_portal.draw(self.screen, self.camera_x, self.camera_y)
+        self.exit_portal.draw(self.screen, self.camera_x, self.camera_y)
 
-        # Draw the bunny
+        # Draw bunny and compass
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
+        self.maze.draw_compass(self.screen, self.bunny, self.exit)
 
-        # Draw the exit portal
-        pygame.draw.rect(self.screen, Config.get('purple'), (
-            self.exit_x * Config.get('bun_size') - self.camera_x, 
-            self.exit_y * Config.get('bun_size') - self.camera_y, 
-            Config.get('bun_size'), Config.get('bun_size')), 0)
-
-        # Draw the compass
-        self.draw_compass()
-
-        # Check for win condition using integer positions
-        if int(self.bunny.x) == self.exit_x and int(self.bunny.y) == self.exit_y:
+        # Win condition
+        if int(self.bunny.x) == self.exit[0] and int(self.bunny.y) == self.exit[1]:
             self.game_over = True
-            self.draw_text("You Win!", 55, Config.get('green'), 
-                          (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
+            self.draw_text("You Win!", 55, Config.get('green'),
+                        (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
             pygame.display.flip()
             pygame.time.wait(2000)
             self.reset_game()
 
-        # Display health
+        # UI
         self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
 
         pygame.display.flip()
+
+    def farm_render(self):
+        # Draw the farm
+        self.farm.draw(self.screen, self.camera_x, self.camera_y)
+
+        # Handle digging (space key)
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            self.farm.dig_tile_at(int(self.bunny.x), int(self.bunny.y))
+
+        # Draw bunny, maze, portals
+        self.bunny.draw(self.screen, self.camera_x, self.camera_y)
+        self.start_portal.draw(self.screen, self.camera_x, self.camera_y)
+        self.exit_portal.draw(self.screen, self.camera_x, self.camera_y)
+        self.maze.draw_compass(self.screen, self.bunny, self.exit)
+
+        # Draw HUD
+        self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
+        pygame.display.flip()
+
+
 
     def run(self):
         while self.running:
             self.handle_events()
             self.update()
-            self.render()
+            self.farm_render()
             self.clock.tick(60)
         pygame.quit()
-        sys.exit()
 
-    def opening_scene(self):
-        while self.running:
-            self.screen.fill(Config.get('black'))
-        pygame.quit()
-
-
-# Game().opening_scene()
-# Game().run()
+Game().run()
 
 

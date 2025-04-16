@@ -1,9 +1,7 @@
 import pygame
-import random
-import sys
-import math
+import random,math
 from config import Config
-from try2 import Bunny
+from bunny import Bunny
 
 class Maze:
     DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -44,7 +42,7 @@ class Maze:
             if self.grid[y][x] == 1:
                 self.grid[y][x] = 0
 
-    def get_random_exit(self, min_distance=2):
+    def get_random_exit(self, min_distance=20):
         """Generate a random exit position on a walkable tile."""
         while True:
             x, y = random.randint(1, self.cols - 2), random.randint(1, self.rows - 2)
@@ -60,3 +58,14 @@ class Maze:
     def is_walkable(self, x, y):
         return 0 <= x < len(self.grid[0]) and 0 <= y < len(self.grid) and self.grid[y][x] == 0
 
+    def draw_compass(self,screen,bunny,exit):
+        dx, dy = exit[0] - int(bunny.x), exit[1] - int(bunny.y)
+        if dx == 0 and dy == 0:
+            angle = 0
+        else:
+            angle = math.atan2(dy, dx)
+        compass_x, compass_y, compass_radius = Config.get('wx') - 100, 50, 40
+        pygame.draw.circle(screen, Config.get('white'), (compass_x, compass_y), compass_radius, 2)
+        arrow_end_x = compass_x + (compass_radius - 10) * math.cos(angle)
+        arrow_end_y = compass_y + (compass_radius - 10) * math.sin(angle)
+        pygame.draw.line(screen, Config.get('red'), (compass_x, compass_y), (arrow_end_x, arrow_end_y), 3)

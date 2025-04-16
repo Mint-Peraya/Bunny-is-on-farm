@@ -27,11 +27,13 @@ class Config:
         'bun_exact': 32,
         'black': (0, 0, 0),
         'white': (255, 255, 255),
+        'gray':(70,70,70),
         'red': (255, 0, 0),
         'green': (0, 255, 0),
         'peach': (255, 200, 200),
         'sky': (200, 255, 255),
         'purple': (200, 0, 210),
+        'dark_purple':(52, 0, 112),
         'brown': (60,5,25),
         'maze': 50 * 64,  # Maze size (50x50 grid)
         'grid': 50,
