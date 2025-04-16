@@ -4,57 +4,7 @@ from config import *
 from maze import Maze
 from bunny import Bunny
 from farm import *
-
-class Portal:
-    def __init__(self, tile_x, tile_y, target_world='maze', target_pos=(1, 1)):
-        self.tile_x = tile_x
-        self.tile_y = tile_y
-        self.target_world = target_world
-        self.target_pos = target_pos
-        self.size = Config.get('bun_size')
-        self.interact_text = "Enter portal (SPACE)"
-
-    def draw_interaction(self, screen):
-        """Draw interaction prompt"""
-        if self.interact_text:
-            font = pygame.font.Font(Config.get('font'), 24)
-            text_surface = font.render(self.interact_text, True, Config.get('white'))
-            screen.blit(text_surface, (10, 10))
-
-    def check_collision(self, bunny):
-        """Check if bunny is touching the portal"""
-        portal_rect = pygame.Rect(
-            self.tile_x * self.size,
-            self.tile_y * self.size,
-            self.size,
-            self.size
-        )
-        return bunny.rect.colliderect(portal_rect)
-
-    def draw(self, screen, camera_x, camera_y):
-        """Draw the portal with pulsing effect"""
-        center_x = self.tile_x * self.size + self.size // 2 - camera_x
-        center_y = self.tile_y * self.size + self.size // 2 - camera_y
-        base_radius = self.size // 2 - 8
-
-        time = pygame.time.get_ticks() / 300
-        pulse = math.sin(time) * 3
-
-        for i in range(3):
-            aura_radius = base_radius + 6 + i * 4 + pulse
-            alpha = 50 - i * 15
-            aura_surf = pygame.Surface((aura_radius * 2, aura_radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(aura_surf, (*Config.get('dark_purple'), alpha),
-                             (aura_radius, aura_radius), int(aura_radius))
-            screen.blit(aura_surf, (center_x - aura_radius, center_y - aura_radius))
-
-        pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
-    
-    def teleport(self, game):
-        if self.target_world == 'maze':
-            game.warp_to_maze()
-        else:
-            game.warp_to_farm()
+from object import *
 
 class Game:
     def __init__(self):
@@ -68,9 +18,12 @@ class Game:
 
     def init_portals(self):
         self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
+        self.farm.interactables.append(self.farm_portal)
         self.maze_enterportal = Portal(1, 1, 'farm', (self.farm.width - 2 , self.farm.height - 2))
         self.exit = self.maze.get_random_exit()
         self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))
+        self.maze.interactables.append(self.maze_enterportal)
+        self.maze.interactables.append(self.maze_exitportal)
 
     def reset_game(self):
         self.farm = Farm(50, 30)
@@ -84,60 +37,44 @@ class Game:
         keys = pygame.key.get_pressed()
         world = self.maze if self.bunny.mode == 'maze' else self.farm
         
-        # Reset interactable
-        self.bunny.current_interactable = None
-        
-        # Get position in front of bunny
-        front_x, front_y = self.bunny.get_front_position()
-        
-        # Check for interactables in front
-        if self.bunny.mode == 'farm':
-            if (0 <= front_x < self.farm.width and 
-                0 <= front_y < self.farm.height):
-                tile = self.farm.tiles[front_y][front_x]
-                if tile.type in ('tree', 'stone') and self.bunny.can_interact_with(tile, world):
-                    self.bunny.current_interactable = tile
-                    if keys[pygame.K_SPACE]:
-                        self.handle_resource_interaction(front_x, front_y)
-        
-        # Check for portals (in both modes)
-        portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
-        for portal in portals:
-            if self.bunny.can_interact_with(portal, world):
-                self.bunny.current_interactable = portal
-                if keys[pygame.K_SPACE] and self.portal_cooldown <= 0:
-                    portal.teleport(self)
-                    self.portal_cooldown = 30
-
-        # Update bunny's current action
-        self.bunny.update_action()
-        
-        # Check if still facing the target
-        if self.bunny.action_target:
-            target_x, target_y = self.bunny.action_target.tile_x, self.bunny.action_target.tile_y
-            front_x, front_y = self.bunny.get_front_position()
-            if not (target_x == front_x and target_y == front_y):
-                self.bunny.current_action = None
-                self.bunny.action_target = None
-                self.bunny.action_progress = 0
-
-        # Movement and camera updates
+        # Handle movement
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
+        
+        # Update world state
+        world.update()
+        
+        # Handle interactions
+        if keys[pygame.K_SPACE]:
+            self.handle_interactions()
+        
+        # Update camera
         self.update_camera()
         
+        # Update cooldowns
         if self.portal_cooldown > 0:
             self.portal_cooldown -= 1
 
-    def handle_resource_interaction(self, x, y):
-        """Handle gathering resources from farm tiles"""
-        tile = self.farm.tiles[y][x]
-        bunny = self.bunny
+    def handle_interactions(self):
+        """Handle all interaction logic"""
+        front_x, front_y = self.bunny.get_front_position()
+        world = self.maze if self.bunny.mode == 'maze' else self.farm
         
-        if tile.type == 'tree' and bunny.current_action != 'cut':
-            bunny.start_action('cut', tile)
-        elif tile.type == 'stone' and bunny.current_action != 'mine':
-            bunny.start_action('mine', tile)
+        # Check for tile interactions in farm mode
+        if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
+            tile = self.farm.tiles[front_y][front_x]
+            if tile.type == 'tree':
+                self.bunny.start_action('cut', tile)
+            elif tile.type == 'stone':
+                self.bunny.start_action('mine', tile)
+        
+        # Check for portal interactions
+        portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
+        for portal in portals:
+            if portal.check_collision(self.bunny) and self.portal_cooldown <= 0:
+                portal.teleport(self)
+                self.portal_cooldown = 30
+                break
 
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
@@ -218,9 +155,10 @@ class Game:
                     self.bunny.inventory.toggle_inventory_view()
             # inside your scene's update or event handler
                 elif event.key == pygame.K_SPACE:  # Assuming E is your interaction key
-                    self.bunny.can_interact_with(self.interactables, self)
-
-
+                    if self.bunny.mode == 'farm':
+                        self.bunny.can_interact_with(self.farm.interactables, self)
+                    elif self.bunny.mode =='maze':
+                        self.bunny.can_interact_with(self.maze.interactables, self)
 
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""

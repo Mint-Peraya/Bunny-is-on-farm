@@ -324,7 +324,7 @@ class Bunny:
     
     def can_interact_with(self, objects, world):
         for obj in objects:
-            if self.can_interact_with(obj):
+            if self.can_interact_with(obj,world):
                 obj.interact(world)
                 self.last_interacted = obj
                 break
