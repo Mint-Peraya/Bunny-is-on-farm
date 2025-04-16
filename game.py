@@ -1,6 +1,6 @@
 import pygame
 import math
-from config import Config
+from config import *
 from maze import Maze
 from bunny import Bunny
 from try2 import *
@@ -49,6 +49,12 @@ class Portal:
             screen.blit(aura_surf, (center_x - aura_radius, center_y - aura_radius))
 
         pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
+    
+    def teleport(self, game):
+        if self.target_world == 'maze':
+            game.warp_to_maze()
+        else:
+            game.warp_to_farm()
 
 class Game:
     def __init__(self):
@@ -57,37 +63,21 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
+        self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.reset_game()
 
-    def reset_game(self):
-        """Initialize or reset game state"""
-        self.farm = Farm(50, 30)  # More reasonable farm size
-        self.maze = Maze(Config.get('grid'), Config.get('grid'))
-        self.bunny = Bunny(1, 1, mode='farm')
-        
-        # Farm portal (bottom right)
-        self.farm_portal = Portal(
-            tile_x=self.farm.width - 2, 
-            tile_y=self.farm.height - 2,
-            target_world='maze',
-            target_pos=(1, 1)
-        )
-        
-        # Maze portal (exit position)
-        self.maze_enterportal = Portal(
-            tile_x=1*Config.get('bun_size'),
-            tile_y=1**Config.get('bun_size'),
-            target_world='farm',
-            target_pos=(1, 1)
-        )
+    def init_portals(self):
+        self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
+        self.maze_enterportal = Portal(1, 1, 'farm', (1, 1))
         self.exit = self.maze.get_random_exit()
-        self.maze_exitportal = Portal(
-            tile_x=self.exit[0],
-            tile_y=self.exit[1],
-            target_world='farm',
-            target_pos=(1, 1)
-        )
-        
+        self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))
+
+
+    def reset_game(self):
+        self.farm = Farm(50, 30)
+        self.bunny = Bunny(1, 1, mode='farm')
+        self.init_portals()
+
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
 
@@ -103,11 +93,8 @@ class Game:
             if self.bunny.can_interact_with(portal):
                 self.bunny.current_interactable = portal
                 if keys[pygame.K_SPACE]:
-                    if self.bunny.mode == 'farm':
-                        self.warp_to_maze()
-                    else:
-                        self.warp_to_farm()
-        
+                    portal.teleport(self)
+
         # Check for nearby resources in farm mode
         if self.bunny.mode == 'farm':
             tile_x, tile_y = int(self.bunny.x), int(self.bunny.y)
@@ -135,23 +122,35 @@ class Game:
         elif tile.type == 'stone':
             self.bunny.add_to_inventory('stone')
             self.farm.tiles[y][x] = Tile('dirt')  # Remove the stone
+    
+    def fade_transition(self):
+        fade_surface = pygame.Surface(Config.get('window'))
+        fade_surface.fill((0, 0, 0))
+        for alpha in range(0, 255, 25):
+            fade_surface.set_alpha(alpha)
+            self.render()  # Draw the current frame
+            self.screen.blit(fade_surface, (0, 0))
+            pygame.display.update()
+            pygame.time.delay(30)
+        
 
     def warp_to_maze(self):
-        """Transition from farm to maze"""
+        """Transition from farm to maze (from portal at bottom right)"""
+        self.fade_transition()
         self.bunny.mode = 'maze'
-        # Position bunny next to (1,1) - adjust based on portal position
-        self.bunny.x, self.bunny.y = 1, 2  # One tile below (1,1)
-        self.bunny.target_x, self.bunny.target_y = 1, 2
-        self.update_camera(instant=True)
+        # Try to land one tile below the entry portal at (1,1)
+        self.teleport_bunny(preferred_x=1, preferred_y=2, world=self.maze)
+        self.game_over = False
+
 
     def warp_to_farm(self):
-        """Transition from maze to farm"""
+        self.fade_transition()
+        """Transition from maze to farm (return near bottom-right portal)"""
         self.bunny.mode = 'farm'
-        # Position bunny next to farm portal
-        self.bunny.x, self.bunny.y = self.farm_portal.tile_x, self.farm_portal.tile_y - 1
-        self.bunny.target_x, self.bunny.target_y = self.farm_portal.tile_x, self.farm_portal.tile_y - 1
-        self.update_camera(instant=True)
+        tx, ty = self.farm_portal.tile_x, self.farm_portal.tile_y - 1  # Try just above the portal
+        self.teleport_bunny(preferred_x=tx, preferred_y=ty, world=self.farm)
         self.game_over = False
+
 
     def render_ui(self):
         """Render UI elements common to both modes"""
@@ -235,6 +234,33 @@ class Game:
             self.game_over = True
             self.draw_text("You Win!", 55, Config.get('green'),
                           (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
+
+    def teleport_bunny(self, preferred_x, preferred_y, world):
+        """Warp bunny to a nearby safe tile, skipping out-of-bound or blocked tiles."""
+        # Determine world bounds
+        max_x = world.width if hasattr(world, 'width') else Config.get('grid')
+        max_y = world.height if hasattr(world, 'height') else Config.get('grid')
+
+        candidate_offsets = [
+            (0, 0), (1, 0), (0, 1), (-1, 0), (0, -1),
+            (1, 1), (-1, -1), (1, -1), (-1, 1)
+        ]
+
+        for dx, dy in candidate_offsets:
+            tx = preferred_x + dx
+            ty = preferred_y + dy
+
+            # 🔒 Safe bounds check first
+            if 0 <= tx < max_x and 0 <= ty < max_y:
+                if self.bunny.can_move_to(tx, ty, world):
+                    self.bunny.x = self.bunny.target_x = tx
+                    self.bunny.y = self.bunny.target_y = ty
+                    self.update_camera(instant=True)
+                    return True
+
+        print(f"⚠️ No walkable tiles near ({preferred_x}, {preferred_y})")
+        return False
+
 
     def render(self):
         """Main render method"""
