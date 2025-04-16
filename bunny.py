@@ -123,13 +123,49 @@ class Bunny:
         self.current_interactable = None
         self.action_time = 0  # Countdown timer in frames
         self.current_action = None  # e.g., 'cut', 'mine', 'dig'
+        self.tools = {
+            'axe': {'level': 1, 'speed': 1.0},  # Base speed multiplier
+            'pickaxe': {'level': 1, 'speed': 1.0}
+        }
+        self.current_tool = None
+        self.action_progress = 0  # 0-100%
+        self.action_target = None  # Tile being worked on
 
-    def start_action(self, action_type):
-        if self.action_time == 0:
-            self.current_action = action_type
-            self.action_time = 60  # Takes 1 second if your FPS is 60
+    def start_action(self, action_type, target_tile):
+        """Start an action with progress tracking"""
+        self.current_action = action_type
+        self.action_target = target_tile
+        self.action_progress = 0
+        
+        # Determine action speed based on tool level
+        if action_type == 'cut':
+            tool_level = self.tools['axe']['level']
+            self.action_speed = 1.0 / tool_level  # Higher level = faster
+        elif action_type == 'mine':
+            tool_level = self.tools['pickaxe']['level']
+            self.action_speed = 1.0 / tool_level
 
-
+    def update_action(self):
+        """Update action progress if performing one"""
+        if self.current_action and self.action_target:
+            self.action_progress += self.action_speed
+            if self.action_progress >= 100:
+                self.complete_action()
+                
+    def complete_action(self):
+        """Finish the current action"""
+        if self.current_action == 'cut' and self.action_target.type == 'tree':
+            self.add_to_inventory('wood')
+            # Instead of replacing with dirt, just make it a "stump"
+            self.action_target.type = 'stump'
+            self.action_target.health = 0
+        elif self.current_action == 'mine' and self.action_target.type == 'stone':
+            self.add_to_inventory('stone')
+            self.action_target.type = 'dirt'  # Stones can be fully removed
+            
+        self.current_action = None
+        self.action_target = None
+        self.action_progress = 0
 
     def load_bunny(self):
         self.sheet = Config.get("bun_sheet")
@@ -240,6 +276,16 @@ class Bunny:
             )
         self.draw_health_bar(screen, camera_x, camera_y)
         self.inventory.draw(screen)
+        # Draw action progress if performing one
+        if self.current_action and self.action_target:
+            bar_width = 50
+            bar_height = 5
+            x = self.x * Config.get('bun_size') - camera_x + (Config.get('bun_size') - bar_width) // 2
+            y = self.y * Config.get('bun_size') - camera_y - 20  # Above health bar
+            
+            pygame.draw.rect(screen, (100, 100, 100), (x, y, bar_width, bar_height))
+            pygame.draw.rect(screen, (0, 200, 200), (x, y, int(bar_width * (self.action_progress / 100)), bar_height))
+
 
     def draw_health_bar(self, screen, camera_x, camera_y):
         bar_width = 50
@@ -264,11 +310,24 @@ class Bunny:
                 items_group.remove(item)
                 break
 
-    def can_interact_with(self, obj):
-        if hasattr(obj, 'tile_x') and hasattr(obj, 'tile_y'):
-            distance = math.sqrt((self.x - obj.tile_x)**2 + (self.y - obj.tile_y)**2)
-            return distance <= self.interact_range
-        return False
+    def get_front_position(self):
+        """Get the position in front of bunny based on current direction"""
+        if self.current_direction == 'front':
+            return int(self.x), int(self.y) + 1
+        elif self.current_direction == 'back':
+            return int(self.x), int(self.y) - 1
+        elif self.current_direction == 'left':
+            return int(self.x) - 1, int(self.y)
+        elif self.current_direction == 'right':
+            return int(self.x) + 1, int(self.y)
+        return int(self.x), int(self.y)  # Default to current position if no direction
+    
+    def can_interact_with(self, objects, world):
+        for obj in objects:
+            if self.can_interact_with(obj):
+                obj.interact(world)
+                self.last_interacted = obj
+                break
 
     def add_to_inventory(self, item_name, amount=1):
         for _ in range(amount):

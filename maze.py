@@ -12,6 +12,7 @@ class Maze:
         self.grid = [[1 for _ in range(cols)] for _ in range(rows)]
         self.generate_maze(1, 1)
         self.add_loops(10)
+        self.interactables = []
 
         # Load and scale images with convert_alpha()
         self.bush_tile = pygame.image.load("assets/picture/bush_dun1.png").convert_alpha()

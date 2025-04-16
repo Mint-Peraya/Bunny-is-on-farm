@@ -3,7 +3,7 @@ import math
 from config import *
 from maze import Maze
 from bunny import Bunny
-from try2 import *
+from farm import *
 
 class Portal:
     def __init__(self, tile_x, tile_y, target_world='maze', target_pos=(1, 1)):
@@ -68,80 +68,77 @@ class Game:
 
     def init_portals(self):
         self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
-        self.maze_enterportal = Portal(1, 1, 'farm', (1, 1))
+        self.maze_enterportal = Portal(1, 1, 'farm', (self.farm.width - 2 , self.farm.height - 2))
         self.exit = self.maze.get_random_exit()
         self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))
-
 
     def reset_game(self):
         self.farm = Farm(50, 30)
         self.bunny = Bunny(1, 1, mode='farm')
         self.init_portals()
-
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
+        self.portal_cooldown = 0
 
     def update(self):
         keys = pygame.key.get_pressed()
         world = self.maze if self.bunny.mode == 'maze' else self.farm
         
-        # Check for nearby interactables
+        # Reset interactable
         self.bunny.current_interactable = None
-        # First: Check for nearby resources
+        
+        # Get position in front of bunny
+        front_x, front_y = self.bunny.get_front_position()
+        
+        # Check for interactables in front
         if self.bunny.mode == 'farm':
-            tile_x, tile_y = int(self.bunny.x), int(self.bunny.y)
-            for dy in range(-1, 2):
-                for dx in range(-1, 2):
-                    check_x, check_y = tile_x + dx, tile_y + dy
-                    if (0 <= check_x < self.farm.width and 
-                        0 <= check_y < self.farm.height):
-                        tile = self.farm.tiles[check_y][check_x]
-                        if tile.type in ('tree', 'stone') and self.bunny.can_interact_with(tile):
-                            self.bunny.current_interactable = tile
-                            if keys[pygame.K_SPACE]:
-                                self.handle_resource_interaction(check_x, check_y)
-                            break  # Prioritize first resource found
-
-        # Then: Check for portals
+            if (0 <= front_x < self.farm.width and 
+                0 <= front_y < self.farm.height):
+                tile = self.farm.tiles[front_y][front_x]
+                if tile.type in ('tree', 'stone') and self.bunny.can_interact_with(tile, world):
+                    self.bunny.current_interactable = tile
+                    if keys[pygame.K_SPACE]:
+                        self.handle_resource_interaction(front_x, front_y)
+        
+        # Check for portals (in both modes)
         portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
-
         for portal in portals:
-            if self.bunny.can_interact_with(portal):
-                # Only override if nothing else to interact with
-                if self.bunny.current_interactable is None:
-                    self.bunny.current_interactable = portal
-                if keys[pygame.K_SPACE]:
+            if self.bunny.can_interact_with(portal, world):
+                self.bunny.current_interactable = portal
+                if keys[pygame.K_SPACE] and self.portal_cooldown <= 0:
                     portal.teleport(self)
                     self.portal_cooldown = 30
 
+        # Update bunny's current action
+        self.bunny.update_action()
+        
+        # Check if still facing the target
+        if self.bunny.action_target:
+            target_x, target_y = self.bunny.action_target.tile_x, self.bunny.action_target.tile_y
+            front_x, front_y = self.bunny.get_front_position()
+            if not (target_x == front_x and target_y == front_y):
+                self.bunny.current_action = None
+                self.bunny.action_target = None
+                self.bunny.action_progress = 0
+
+        # Movement and camera updates
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
-        self.update_camera()  # ✅ Always follow bunny!
-
-        tile_x, tile_y = round(self.bunny.x), round(self.bunny.y)
-        for dy in range(-1, 2):
-            for dx in range(-1, 2):
-                check_x, check_y = tile_x + dx, tile_y + dy
-                if (0 <= check_x < self.farm.width and 0 <= check_y < self.farm.height):
-                    tile = self.farm.tiles[check_y][check_x]
-                    if tile.type in ('tree', 'stone'):
-                        print(f"✅ Found {tile.type} at {check_x},{check_y}")
-                        self.bunny.current_interactable = tile
-                        if keys[pygame.K_SPACE]:
-                            self.handle_resource_interaction(check_x, check_y)
-                        break
-
+        self.update_camera()
+        
+        if self.portal_cooldown > 0:
+            self.portal_cooldown -= 1
 
     def handle_resource_interaction(self, x, y):
         """Handle gathering resources from farm tiles"""
         tile = self.farm.tiles[y][x]
-        if tile.type == 'tree':
-            self.bunny.add_to_inventory('wood')
-            self.farm.tiles[y][x] = Tile('dirt')  # Remove the tree
-        elif tile.type == 'stone':
-            self.bunny.add_to_inventory('stone')
-            self.farm.tiles[y][x] = Tile('dirt')  # Remove the stone
-    
+        bunny = self.bunny
+        
+        if tile.type == 'tree' and bunny.current_action != 'cut':
+            bunny.start_action('cut', tile)
+        elif tile.type == 'stone' and bunny.current_action != 'mine':
+            bunny.start_action('mine', tile)
+
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
         fade_surface.fill((0, 0, 0))
@@ -151,29 +148,23 @@ class Game:
             self.screen.blit(fade_surface, (0, 0))
             pygame.display.update()
             pygame.time.delay(30)
-        
 
     def warp_to_maze(self):
-        """Transition from farm to maze (from portal at bottom right)"""
+        """Transition from farm to maze"""
         self.fade_transition()
         self.bunny.mode = 'maze'
-        # Try to land one tile below the entry portal at (1,1)
-        self.teleport_bunny(preferred_x=1, preferred_y=2, world=self.maze)
+        self.teleport_bunny(world=self.maze)
         self.game_over = False
-
 
     def warp_to_farm(self):
+        """Transition from maze to farm"""
         self.fade_transition()
-        """Transition from maze to farm (return near bottom-right portal)"""
         self.bunny.mode = 'farm'
-        tx, ty = self.farm_portal.tile_x, self.farm_portal.tile_y - 1  # Try just above the portal
-        self.teleport_bunny(preferred_x=tx, preferred_y=ty, world=self.farm)
+        self.teleport_bunny(world=self.farm)
         self.game_over = False
 
-
     def render_ui(self):
-        """Render UI elements common to both modes"""
-        # Draw bunny in both modes
+        """Render UI elements"""
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
         
         # Draw HUD
@@ -197,7 +188,6 @@ class Game:
         
         # Draw inventory
         self.bunny.inventory.draw(self.screen)
-
         
         # Draw compass in maze mode
         if self.bunny.mode == 'maze' and not self.game_over:
@@ -224,6 +214,13 @@ class Game:
                     self.reset_game()
                 elif event.key == pygame.K_m:  # Manual mode switch for testing
                     self.bunny.switch_mode()
+                elif event.key == pygame.K_i:  # Toggle inventory view
+                    self.bunny.inventory.toggle_inventory_view()
+            # inside your scene's update or event handler
+                elif event.key == pygame.K_SPACE:  # Assuming E is your interaction key
+                    self.bunny.can_interact_with(self.interactables, self)
+
+
 
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""
@@ -235,18 +232,12 @@ class Game:
         """Render farm mode"""
         self.farm.draw(self.screen, self.camera_x, self.camera_y)
         self.farm_portal.draw(self.screen, self.camera_x, self.camera_y)
-        
-        # Farm-specific controls
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_SPACE]:
-            self.farm.dig_tile_at(int(self.bunny.x), int(self.bunny.y))
 
     def render_maze(self):
         """Render maze mode"""
         self.maze.draw(self.screen, self.camera_x, self.camera_y)
         self.maze_enterportal.draw(self.screen, self.camera_x, self.camera_y)
         self.maze_exitportal.draw(self.screen, self.camera_x, self.camera_y)
-
         
         # Win condition check
         if int(self.bunny.x) == self.exit[0] and int(self.bunny.y) == self.exit[1]:
@@ -254,31 +245,17 @@ class Game:
             self.draw_text("You Win!", 55, Config.get('green'),
                           (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
 
-    def teleport_bunny(self, preferred_x, preferred_y, world):
-        """Warp bunny to a nearby safe tile, skipping out-of-bound or blocked tiles."""
-        # Determine world bounds
-        max_x = world.width if hasattr(world, 'width') else Config.get('grid')
-        max_y = world.height if hasattr(world, 'height') else Config.get('grid')
-
-        candidate_offsets = [
-            (0, 0), (1, 0), (0, 1), (-1, 0), (0, -1),
-            (1, 1), (-1, -1), (1, -1), (-1, 1)
-        ]
-
-        for dx, dy in candidate_offsets:
-            tx = preferred_x + dx
-            ty = preferred_y + dy
-
-            # 🔒 Safe bounds check first
-            if 0 <= tx < max_x and 0 <= ty < max_y:
-                if self.bunny.can_move_to(tx, ty, world):
-                    self.bunny.x = self.bunny.target_x = tx
-                    self.bunny.y = self.bunny.target_y = ty
-                    self.update_camera(instant=True)
-                    return True
-
-        print(f"⚠️ No walkable tiles near ({preferred_x}, {preferred_y})")
-        return False
+    def teleport_bunny(self, world):
+        if world == 'maze' and self.bunny.can_move_to(1, 1, world):
+            self.bunny.x = self.bunny.target_x = 1
+            self.bunny.y = self.bunny.target_y = 1
+            self.update_camera(instant=True)
+            return True
+        if world == 'farm' and self.bunny.can_move_to(self.farm.width - 2, self.farm.height - 2, world):
+            self.bunny.x = self.bunny.target_x = self.farm.width - 2
+            self.bunny.y = self.bunny.target_y = self.farm.height - 2
+            self.update_camera(instant=True)
+            return True
 
 
     def render(self):

@@ -6,7 +6,7 @@ A pixel-art styled farming and maze adventure game where you play as a bunny. Ch
 
 ## 📦 Installation Instructions
 
-1. Clone the repository from github
+1. Clone the repository from github at version v0.5 or v1.0
     https://github.com/Mint-Peraya/Bunny-is-on-farm.git
 
 2. Run the game: ```python play.py```

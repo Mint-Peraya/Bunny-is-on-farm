@@ -3,15 +3,24 @@ import random
 from config import Config
 
 class Tile:
-    def __init__(self, tile_type='dirt'):
+    def __init__(self, tile_type='dirt', x=0, y=0):
         self.type = tile_type
         self.dug = False
-        self.tile_x = 0  # Will be set when placed in farm
-        self.tile_y = 0  # Will be set when placed in farm
+        self.tile_x = x  # Track position
+        self.tile_y = y
+        self.health = 10 if tile_type in ('tree', 'stone') else 0
+        self.max_health = 10 if tile_type in ('tree', 'stone') else 0
+        self.interactables = []
 
     def dig(self):
         if self.type == 'dirt':
             self.dug = True
+
+    def take_damage(self, amount):
+        if self.type in ('tree', 'stone'):
+            self.health = max(0, self.health - amount)
+            return self.health <= 0
+        return False
 
     def draw(self, screen, x, y):
         size = Config.get('bun_size')
@@ -25,15 +34,27 @@ class Tile:
             color = (160, 100, 50)
 
         pygame.draw.rect(screen, color, (x, y, size, size))
+        
+        # Draw health bar for resources
+        if self.type in ('tree', 'stone') and self.health < self.max_health:
+            bar_width = size - 10
+            bar_height = 5
+            health_percent = self.health / self.max_health
+            pygame.draw.rect(screen, (255, 0, 0), (x + 5, y + 5, bar_width, bar_height))
+            pygame.draw.rect(screen, (0, 255, 0), (x + 5, y + 5, int(bar_width * health_percent), bar_height))
 
 
 class Farm:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.tiles = [[Tile('dirt') for _ in range(width)] for _ in range(height)]
-
+        self.tiles = [[Tile('dirt', x, y) for x in range(width)] for y in range(height)]
         self.populate_obstacles()
+        self.interactables = []
+
+        # Add more interactables like chests, beds, etc. if needed
+        # self.chest = Chest(tile_x=3, tile_y=6)
+        # self.interactables.append(self.chest)
 
     def populate_obstacles(self):
         for y in range(self.height):

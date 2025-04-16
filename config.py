@@ -61,10 +61,13 @@ class Config:
 
     }
 
+    # config.py - Add to RESOURCE_ITEMS
     RESOURCE_ITEMS = {
         "wood": ResourceItem("wood", "assets/items/wood.png"),
         "stone": ResourceItem("stone", "assets/items/stone.png"),
-        "carrot": ResourceItem("carrot", "assets/items/carrot.png")
+        "carrot": ResourceItem("carrot", "assets/items/carrot.png"),
+        "axe": ResourceItem("axe", "assets/items/axe.png"),
+        "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png")
     }
 
     # Store images separately to prevent premature loading
