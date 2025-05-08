@@ -107,15 +107,13 @@ class Tile:
         if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
             self.watered = False
 
+
 class Farm:
-    def __init__(self, game, width=50, height=30):
-        self.game = game
+    def __init__(self, width=50, height=30):  # Remove game parameter
         self.width = width
         self.height = height
         self.tiles = [[Tile('dirt', x, y) for x in range(width)] for y in range(height)]
         self.interactables = []
-        
-        # Initialize terrain
         self._generate_terrain()
         
     def _generate_terrain(self):

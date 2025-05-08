@@ -88,40 +88,13 @@ class Game:
         self.maze.interactables.append(self.maze_exitportal)
 
     def reset_game(self):
-        self.farm = Farm(50, 30)
+        self.farm = Farm(50, 30)  # No need to pass game instance
         self.bunny = Bunny(1, 1, mode='farm')
         self.init_portals()
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
         self.portal_cooldown = 0
-
-    def update(self):
-        """Update the game state based on current mode"""
-        keys = pygame.key.get_pressed()
-        world = self.maze if self.bunny.mode == 'maze' else self.farm if self.bunny.mode == 'farm' else self.dungeon
-        
-        # Handle movement
-        moving = self.bunny.move(keys, world)
-        self.bunny.update_animation(moving)
-        self.bunny.update_action()
-
-        # Update world state (separate updates for Farm, Dungeon, and Maze)
-        if self.bunny.mode == 'dungeon':
-            world.update(self.bunny)  # Pass bunny to dungeon update
-        else:
-            world.update()  # No bunny needed for farm or maze
-
-        # Handle interactions
-        if keys[pygame.K_SPACE]:
-            self.handle_interactions()
-
-        # Update camera
-        self.update_camera()
-
-        # Update cooldowns
-        if self.portal_cooldown > 0:
-            self.portal_cooldown -= 1
-
+        self.dungeon = Dungeon(30, 30, self.bunny)  # Reinitialize dungeon
 
     def handle_interactions(self):
         """Handle all interaction logic"""
@@ -279,20 +252,6 @@ class Game:
         self.render_ui()
         pygame.display.flip()
 
-    def render_dungeon(self):
-        """Render dungeon layout and enemies"""
-        self.dungeon.render(self.screen, self.camera_x, self.camera_y)
-
-        # Check for win condition in the dungeon
-        if self.bunny.x == self.dungeon.exit_x and self.bunny.y == self.dungeon.exit_y:
-            self.game_over = True
-            self.success = True
-            self.end_time = pygame.time.get_ticks()
-            time_taken = (self.end_time - self.dungeon_start_time) / 1000  # Time in seconds
-            self.log_to_csv(time_taken, self.success)
-
-
-
     def run(self):
         """Main game loop"""
         while self.running:
@@ -301,6 +260,55 @@ class Game:
             self.render()
             self.clock.tick(60)
         pygame.quit()
+
+    def update(self):
+        """Update the game state based on current mode"""
+        keys = pygame.key.get_pressed()
+        
+        # Determine current world based on mode
+        if self.bunny.mode == 'maze':
+            world = self.maze
+        elif self.bunny.mode == 'farm':
+            world = self.farm
+        else:  # dungeon mode
+            world = self.dungeon
+
+        # Handle movement
+        moving = self.bunny.move(keys, world)
+        self.bunny.update_animation(moving)
+        self.bunny.update_action()
+
+        # Update world state
+        if hasattr(world, 'update'):
+            if self.bunny.mode == 'dungeon':
+                world.update(self.bunny)
+            else:
+                world.update()
+
+        # Handle interactions
+        if keys[pygame.K_SPACE]:
+            self.handle_interactions()
+
+        # Update camera
+        self.update_camera()
+
+        # Update cooldowns
+        if self.portal_cooldown > 0:
+            self.portal_cooldown -= 1
+
+    def render_dungeon(self):
+        """Render dungeon layout and enemies"""
+        self.dungeon.render(self.screen, self.camera_x, self.camera_y)
+
+        # Check for win condition in the dungeon
+        if (int(self.bunny.x) == self.dungeon.exit_x and 
+            int(self.bunny.y) == self.dungeon.exit_y):
+            self.game_over = True
+            self.success = True
+            end_time = pygame.time.get_ticks()
+            time_taken = (end_time - self.dungeon_start_time) / 1000
+            self.log_to_csv(time_taken, self.success)
+
 
 if __name__ == "__main__":
     Game().run()

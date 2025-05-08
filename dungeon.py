@@ -161,6 +161,8 @@ class Enemy:
         self.has_dropped_loot = False
         self.fire_particles = []
         self.fire_timer = 0
+        self.special_attack_timer = 0  # Add this line
+        self.attack_cooldown = 0  # Add this line
         
         # Set stats based on type
         if enemy_type == "boss":
@@ -317,10 +319,11 @@ class Enemy:
 
 class Boss(Enemy):
     def __init__(self, x, y):
-        super().__init__(x, y)  # Initialize parent class (Enemy)
-        self.direction_timer = 5  # Reset the direction timer
-        self.patrol_direction = 'left'  # Patrol direction starts as 'left'
-        # Other attributes (health, speed, etc.) can be initialized here
+        super().__init__(x, y, "boss")
+        self.patrol_direction = 'left'  # Add this line
+        self.direction_timer = 5  # Add this line
+        self.special_attack_timer = 180  # Add this line
+        self.attack_cooldown = 0  # Add this line
     
     def patrol(self):
         """Handle the patrol logic for the Boss"""
