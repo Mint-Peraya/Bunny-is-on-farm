@@ -1,20 +1,82 @@
 import pygame
-import math
+import csv
 from config import *
 from maze import Maze
 from bunny import Bunny
 from farm import *
 from object import *
+from dungeon import Dungeon 
+
 
 class Game:
     def __init__(self):
+        self.start_time = None
+        self.previous_exit = None
+        self.has_warped = False
+        self.running = True
         pygame.init()
         self.screen = pygame.display.set_mode(Config.get('window'))
         self.clock = pygame.time.Clock()
-        self.running = True
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.reset_game()
+        self.bunny = Bunny(1, 1, mode='farm')  # Create the bunny object
+        self.dungeon = Dungeon(30, 30, self.bunny)  # Pass the bunny into Dungeon
+
+    def warp_to_dungeon(self):
+        """Transition to dungeon mode"""
+        self.fade_transition()
+        self.bunny.mode = 'dungeon'
+        self.dungeon_start_time = pygame.time.get_ticks()  # Start timer for dungeon mode
+        self.has_warped = True
+        self.game_over = False
+        self.portal_cooldown = 30  # Add cooldown to prevent immediate return
+        self.update_camera(instant=True)
+
+
+    def warp_to_maze(self):
+        self.fade_transition()
+        self.bunny.mode = 'maze'
+        # Warp bunny to maze at the enter portal position
+        self.bunny.x = self.maze_enterportal.tile_x
+        self.bunny.y = self.maze_enterportal.tile_y
+        self.bunny.target_x = self.bunny.x
+        self.bunny.target_y = self.bunny.y
+        self.game_over = False
+        self.start_time = pygame.time.get_ticks()
+        self.previous_exit = None
+        self.has_warped = True
+        self.update_camera(instant=True)
+        self.portal_cooldown = 30  # Add cooldown to prevent immediate return
+
+    def warp_to_farm(self):
+        self.fade_transition()
+        self.bunny.mode = 'farm'
+        # Use target_pos from whichever portal was used
+        source = self.maze_enterportal if self.bunny.x == self.maze_enterportal.tile_x else self.maze_exitportal
+        self.teleport_bunny(self.farm, source.target_pos)
+        self.game_over = False
+        self.has_warped = True  # Mark that the bunny has warped
+
+    def render_maze(self):
+        """Render maze mode"""
+        self.maze.draw(self.screen, self.camera_x, self.camera_y)
+        self.maze_enterportal.draw(self.screen, self.camera_x, self.camera_y)
+        self.maze_exitportal.draw(self.screen, self.camera_x, self.camera_y)
+
+        # Only check for exit if not just warped
+        if not self.has_warped and int(self.bunny.x) == self.exit[0] and int(self.bunny.y) == self.exit[1]:
+            print(f"Bunny reached the exit!")
+            self.game_over = True
+            self.success = True
+            self.previous_exit = (self.exit[0], self.exit[1])
+            self.exit = self.maze.get_random_exit()
+            
+            # Log the result
+            end_time = pygame.time.get_ticks()
+            time_taken = (end_time - self.start_time) / 1000
+            self.log_to_csv(time_taken, self.success)
+        
 
     def init_portals(self):
         self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
@@ -34,28 +96,32 @@ class Game:
         self.portal_cooldown = 0
 
     def update(self):
+        """Update the game state based on current mode"""
         keys = pygame.key.get_pressed()
-        world = self.maze if self.bunny.mode == 'maze' else self.farm
+        world = self.maze if self.bunny.mode == 'maze' else self.farm if self.bunny.mode == 'farm' else self.dungeon
         
         # Handle movement
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
-        
         self.bunny.update_action()
-        
-        # Update world state
-        world.update()
-        
+
+        # Update world state (separate updates for Farm, Dungeon, and Maze)
+        if self.bunny.mode == 'dungeon':
+            world.update(self.bunny)  # Pass bunny to dungeon update
+        else:
+            world.update()  # No bunny needed for farm or maze
+
         # Handle interactions
         if keys[pygame.K_SPACE]:
             self.handle_interactions()
-        
+
         # Update camera
         self.update_camera()
-        
+
         # Update cooldowns
         if self.portal_cooldown > 0:
             self.portal_cooldown -= 1
+
 
     def handle_interactions(self):
         """Handle all interaction logic"""
@@ -88,7 +154,7 @@ class Game:
         for portal in portals:
             if portal.check_collision(self.bunny) and self.portal_cooldown <= 0:
                 portal.teleport(self)
-                self.portal_cooldown = 30
+                self.portal_cooldown = 50000
                 break
 
     def fade_transition(self):
@@ -100,20 +166,6 @@ class Game:
             self.screen.blit(fade_surface, (0, 0))
             pygame.display.update()
             pygame.time.delay(30)
-
-    def warp_to_maze(self):
-        self.fade_transition()
-        self.bunny.mode = 'maze'
-        self.teleport_bunny(self.maze, self.farm_portal.target_pos)
-        self.game_over = False
-
-    def warp_to_farm(self):
-        self.fade_transition()
-        self.bunny.mode = 'farm'
-        # Use target_pos from whichever portal was used
-        source = self.maze_enterportal if self.bunny.x == self.maze_enterportal.tile_x else self.maze_exitportal
-        self.teleport_bunny(self.farm, source.target_pos)
-        self.game_over = False
 
     def render_ui(self):
         """Render UI elements"""
@@ -168,6 +220,9 @@ class Game:
                     self.bunny.switch_mode()
                 elif event.key == pygame.K_i:  # Toggle inventory view
                     self.bunny.inventory.toggle_inventory_view()
+                elif event.key == pygame.K_d:  # Example: switch to dungeon mode when pressing 'D'
+                    self.warp_to_dungeon()  # Call the dungeon transition method
+
             # inside your scene's update or event handler
                 elif event.key == pygame.K_SPACE:  # Assuming E is your interaction key
                     if self.bunny.mode == 'farm':
@@ -194,17 +249,12 @@ class Game:
         self.farm.draw(self.screen, self.camera_x, self.camera_y)
         self.farm_portal.draw(self.screen, self.camera_x, self.camera_y)
 
-    def render_maze(self):
-        """Render maze mode"""
-        self.maze.draw(self.screen, self.camera_x, self.camera_y)
-        self.maze_enterportal.draw(self.screen, self.camera_x, self.camera_y)
-        self.maze_exitportal.draw(self.screen, self.camera_x, self.camera_y)
-        
-        # Win condition check
-        if int(self.bunny.x) == self.exit[0] and int(self.bunny.y) == self.exit[1]:
-            self.game_over = True
-            self.draw_text("You Win!", 55, Config.get('green'),
-                          (Config.get('wx') // 2 - 70, Config.get('wy') // 2 - 30))
+    def log_to_csv(self, time_taken, success):
+        """Log game results (time, success/failure) into CSV file"""
+        print(f"Logging to CSV: Time taken = {time_taken}, Success = {success}")  # Debugging line
+        with open('maze_log.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([time_taken, success])
 
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
@@ -221,11 +271,27 @@ class Game:
         
         if self.bunny.mode == 'farm':
             self.render_farm()
-        else:
+        elif self.bunny.mode == 'maze':
             self.render_maze()
-        
+        elif self.bunny.mode == 'dungeon':
+            self.render_dungeon()
+
         self.render_ui()
         pygame.display.flip()
+
+    def render_dungeon(self):
+        """Render dungeon layout and enemies"""
+        self.dungeon.render(self.screen, self.camera_x, self.camera_y)
+
+        # Check for win condition in the dungeon
+        if self.bunny.x == self.dungeon.exit_x and self.bunny.y == self.dungeon.exit_y:
+            self.game_over = True
+            self.success = True
+            self.end_time = pygame.time.get_ticks()
+            time_taken = (self.end_time - self.dungeon_start_time) / 1000  # Time in seconds
+            self.log_to_csv(time_taken, self.success)
+
+
 
     def run(self):
         """Main game loop"""

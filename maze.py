@@ -1,7 +1,11 @@
 import pygame
-import random,math
+import random
+import math
+import time  # For time tracking
+import csv  # For CSV logging
 from config import Config
 from bunny import Bunny
+
 
 class Maze:
     DIRECTIONS = [(0, -1), (1, 0), (0, 1), (-1, 0)]
@@ -26,7 +30,7 @@ class Maze:
             return "stone"  # wall (optional, if you want)
         else:
             return "dirt"  # change this based on your tiles
-    
+
     def generate_maze(self, x, y):
         self.grid[y][x] = 0
         directions = self.DIRECTIONS.copy()

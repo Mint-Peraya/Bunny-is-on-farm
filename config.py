@@ -58,8 +58,12 @@ class Config:
         'yellow': (200, 200, 0),
         'font':"assets/fonts/pixel.ttf",
         'FPS': 60,
-
-    }
+        'environ':{
+        'dirt': pygame.image.load('assets/picture/grass1.png').convert_alpha(),
+        'soil_overlay': pygame.image.load('assets/picture/soil_overlay.png').convert_alpha(),
+        'tree': pygame.image.load('assets/picture/tree.png').convert_alpha(),
+        'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
+    }}
 
     # config.py - Add to RESOURCE_ITEMS
     RESOURCE_ITEMS = {
@@ -87,6 +91,8 @@ class Config:
             'left_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_left_damage.png').convert_alpha()),
             'right_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_right_damage.png').convert_alpha())
         }
+    
+ 
 
     @classmethod
     def get(cls, key):

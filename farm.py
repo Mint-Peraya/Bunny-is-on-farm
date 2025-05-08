@@ -3,6 +3,7 @@ import random
 from config import Config
 from object import *
 
+
 class Tile:
     def __init__(self, tile_type='dirt', x=0, y=0):
         self.type = tile_type
@@ -16,10 +17,12 @@ class Tile:
         self.watered = False
         self.last_watered = 0
 
-    def water(self):
-        self.watered = True
-        self.last_watered = pygame.time.get_ticks()
-    
+        # Visual modifiers
+        self.tree_scale = random.uniform(1.1, 1.6) if self.type == 'tree' else 1.0
+        self.stone_scale = random.uniform(0.6, 0.9) if self.type == 'stone' else 1.0
+        self.image_rotation = random.choice([0, 0, 0, 5, -5]) if self.type in ('tree', 'stone') else 0
+        self.image_offset_x = random.randint(-4, 4) if self.type in ('tree', 'stone') else 0
+
     @property
     def x(self):
         return self.tile_x
@@ -28,6 +31,9 @@ class Tile:
     def y(self):
         return self.tile_y
 
+    def water(self):
+        self.watered = True
+        self.last_watered = pygame.time.get_ticks()
 
     def dig(self):
         if self.type == 'dirt':
@@ -45,30 +51,60 @@ class Tile:
         size = Config.get('bun_size')
         x = self.tile_x * size - camera_x
         y = self.tile_y * size - camera_y
-        
-        colors = {
-            'dirt': (139, 69, 19),
-            'stone': (120, 120, 120),
-            'tree': (34, 139, 34),
-            'stump': (60, 30, 10)
-        }
-        
-        color = colors.get(self.type, (160, 100, 50)) if not self.dug else (160, 100, 50)
-        pygame.draw.rect(screen, color, (x, y, size, size))
-        
+
+        env_images = Config.get('environ')
+        base_image = env_images.get(self.type, env_images['dirt'])
+
+        # Default draw settings
+        draw_width, draw_height = size, size
+        offset_y = 0
+        scale = 1.0
+
+        # Custom scaling
+        if self.type == 'tree':
+            scale = self.tree_scale
+        elif self.type == 'stone':
+            scale = self.stone_scale
+
+        draw_width = int(size * scale)
+        draw_height = int(size * scale)
+        offset_y = size - draw_height  # tree/stone lifted from tile base
+
+        # Apply scaling and rotation
+        image = pygame.transform.scale(base_image, (draw_width, draw_height))
+        image = pygame.transform.rotate(image, self.image_rotation)
+
+        # Draw soft shadow
+        shadow = pygame.Surface((draw_width, draw_height // 4), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow, (0, 0, 0, 60), shadow.get_rect())
+        screen.blit(shadow, (x + (size - draw_width) // 2 + self.image_offset_x, y + size - draw_height // 4))
+
+        # Draw the object
+        screen.blit(image, (x + (size - draw_width) // 2 + self.image_offset_x, y + offset_y))
+
+        # Soil overlay if dug
+        if self.dug and self.type == 'dirt':
+            soil_overlay = env_images.get('soil_overlay')
+            if soil_overlay:
+                soil_overlay = pygame.transform.scale(soil_overlay, (size, size))
+                screen.blit(soil_overlay, (x, y))
+
+        # Health bar
         if self.type in ('tree', 'stone') and self.health < self.max_health:
             bar_width = size - 10
             bar_height = 5
             health_percent = self.health / self.max_health
             pygame.draw.rect(screen, (255, 0, 0), (x + 5, y + 5, bar_width, bar_height))
             pygame.draw.rect(screen, (0, 255, 0), (x + 5, y + 5, int(bar_width * health_percent), bar_height))
+
+        # Water overlay
         if self.watered:
             water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
             water_overlay.fill((0, 100, 255, 60))
             screen.blit(water_overlay, (x, y))
 
     def update(self):
-        if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:  # 10 sec
+        if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
             self.watered = False
 
 class Farm:
