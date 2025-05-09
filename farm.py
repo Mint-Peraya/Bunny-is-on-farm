@@ -102,6 +102,26 @@ class Tile:
             water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
             water_overlay.fill((0, 100, 255, 60))
             screen.blit(water_overlay, (x, y))
+    
+    def draw(self, screen, camera_x, camera_y):
+        size = Config.get('bun_size')
+        x = self.tile_x * size - camera_x
+        y = self.tile_y * size - camera_y
+
+        # Draw base tile
+        env_images = Config.get('environ')
+        base_image = env_images.get(self.type, env_images['dirt'])
+        screen.blit(pygame.transform.scale(base_image, (size, size)), (x, y))
+
+        # Draw plant if exists
+        if self.plant:
+            self.plant.draw(screen, x, y, size)
+
+        # Draw other overlays (water, etc.)
+        if self.watered:
+            water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
+            water_overlay.fill((0, 100, 255, 60))
+            screen.blit(water_overlay, (x, y))
 
     def update(self):
         if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
@@ -130,22 +150,20 @@ class Farm:
     def update(self):
         current_time = pygame.time.get_ticks()
         
-        # Only update calendar once per frame
+        # Update calendar
         prev_season = self.calendar.current_season
         self.calendar.update()
         
         if prev_season != self.calendar.current_season:
-            self.bunny.inventory.show_notification(
-                f"Season changed to {self.calendar.current_season}!",
-                (200, 200, 100)
-            )
+            print(f"Season changed to {self.calendar.current_season}")
         
         # Only update plants every 100ms to reduce lag
-        if current_time % 100 < 16:  # Roughly 10 times per second
+        if current_time % 100 < 16:  # About 10 times per second
             for row in self.tiles:
                 for tile in row:
                     if tile.plant:
                         tile.plant.update(self.calendar.current_season)
+                    tile.update()  # Update tile state (like watering)
         
     def _generate_terrain(self):
         """Generate trees, stones, and other terrain features"""
@@ -200,42 +218,10 @@ class Plant:
         color = self.growth_stages[self.stage]
         pygame.draw.rect(screen, color, (x, y, tile_size, tile_size))
 
-# In farm.py - Update Plant class
 class Plant:
-    CROP_TYPES = {
-        "carrot": {
-            "stages": 4,
-            "grow_time": 3000,  # per stage
-            "seasons": ["Spring", "Fall"],
-            "harvest_item": "carrot",
-            "harvest_amount": 2
-        },
-        "wheat": {
-            "stages": 5,
-            "grow_time": 5000,
-            "seasons": ["Summer"],
-            "harvest_item": "wheat",
-            "harvest_amount": 3
-        },
-        "pumpkin": {
-            "stages": 6,
-            "grow_time": 7000,
-            "seasons": ["Fall"],
-            "harvest_item": "pumpkin",
-            "harvest_amount": 1
-        },
-        "potato": {
-            "stages": 4,
-            "grow_time": 4000,
-            "seasons": ["Spring", "Summer"],
-            "harvest_item": "potato",
-            "harvest_amount": 3
-        }
-    }
-
     def __init__(self, crop_type, growth_images):
         self.crop_type = crop_type
-        self.config = self.CROP_TYPES[crop_type]
+        self.config = Config.PLANT_CONFIG[crop_type]
         self.growth_images = growth_images
         self.stage = 0
         self.max_stage = self.config["stages"] - 1
@@ -257,33 +243,32 @@ class Plant:
                     self.harvestable = True
 
     def draw(self, screen, x, y, tile_size):
-        stage_img = self.growth_images[self.stage]
-        scaled_img = pygame.transform.scale(stage_img, (tile_size, tile_size))
-        screen.blit(scaled_img, (x, y))
+        if 0 <= self.stage < len(self.growth_images):
+            stage_img = self.growth_images[self.stage]
+            if stage_img:  # Check if image exists
+                scaled_img = pygame.transform.scale(stage_img, (tile_size, tile_size))
+                screen.blit(scaled_img, (x, y))
         
     def harvest(self):
         if self.harvestable:
             self.harvestable = False
             return (self.config["harvest_item"], self.config["harvest_amount"])
         return None
+    
 
 class Calendar:
     def __init__(self):
         self.seasons = ["Spring", "Summer", "Fall", "Winter"]
         self.days_of_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         self.current_season_index = 0
-        self.current_day = 0  # 0-6 (Sunday-Saturday)
-        self.current_date = 1  # 1-28
+        self.current_day = 0
+        self.current_date = 1
         self.day_timer = 0
-        self.day_duration = 60000  # 60 seconds per day (adjust as needed)
-        self.last_update_time = 0  # Initialize to 0
+        self.day_duration = 60000  # 60 seconds per day
+        self.last_update_time = pygame.time.get_ticks()
         
     def update(self):
         current_time = pygame.time.get_ticks()
-        if self.last_update_time == 0:  # First update
-            self.last_update_time = current_time
-            return
-            
         delta_time = current_time - self.last_update_time
         self.last_update_time = current_time
         
@@ -298,7 +283,6 @@ class Calendar:
         if self.current_date > 28:
             self.current_date = 1
             self.current_season_index = (self.current_season_index + 1) % 4
-            print(f"Season changed to {self.current_season}")
             
     @property
     def current_season(self):
@@ -310,3 +294,5 @@ class Calendar:
         
     def get_date_string(self):
         return f"{self.current_day_name}, Day {self.current_date} of {self.current_season}"
+    
+        i

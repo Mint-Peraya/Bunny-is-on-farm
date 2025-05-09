@@ -1,5 +1,6 @@
 import pygame
 import csv
+import json
 from config import *
 from maze import Maze
 from bunny import Bunny
@@ -313,7 +314,9 @@ class Game:
             end_time = pygame.time.get_ticks()
             time_taken = (end_time - self.dungeon_start_time) / 1000
             self.log_to_csv(time_taken, self.success)
-
+    
+    def save_game():
+        pass
 
 if __name__ == "__main__":
     Game().run()
