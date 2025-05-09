@@ -4,7 +4,7 @@ from config import *
 from collections import defaultdict
 
 class Inventory:
-    def __init__(self, capacity=10):  # Increased capacity
+    def __init__(self, capacity=5):  # Increased capacity
         self.capacity = capacity
         self.items = defaultdict(int)
         # Start with some seeds
@@ -15,16 +15,17 @@ class Inventory:
 
 
     def is_full(self):
-        return sum(self.items.values()) >= self.capacity
+        # Return True if the number of unique items exceeds the capacity
+        return len(self.items) >= self.capacity
 
     def add_item(self, item):
-        if not self.is_full() or item.name in self.items:
+        if len(self.items) < self.capacity:  # Check if there's space for new items
             self.items[item.name] += 1
+            if self.items[item.name] <= 0:  # If count reaches zero, delete the item
+                del self.items[item.name]
             self.show_notification(f"Picked up {item.name}", (0, 255, 0))
             return True
         self.show_notification("Inventory Full!", (255, 0, 0))
-        if self.items[item.name] <= 0:
-            del self.items[item.name]
         return False
 
     def draw(self, screen):
@@ -35,7 +36,7 @@ class Inventory:
 
     def draw_quick_bar(self, screen):
         slot_size = 64
-        padding = 10
+        padding = 5
         start_x = (screen.get_width() - (slot_size + padding) * self.capacity) // 2
         y = screen.get_height() - slot_size - 10
 
@@ -43,18 +44,21 @@ class Inventory:
         for i in range(self.capacity):
             rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
             pygame.draw.rect(screen, (200, 200, 200), rect, 2)
+
             if i < len(item_list):
                 name, count = item_list[i]
-                item = Config.RESOURCE_ITEMS[name]
-                img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-                screen.blit(img, (rect.x + 5, rect.y + 5))
-                font = pygame.font.SysFont(None, 22)
-                count_surface = font.render(str(count), True, (255, 255, 255))
-                screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
+                if count > 0:  # Only draw the item if count is greater than 0
+                    item = Config.RESOURCE_ITEMS[name]
+                    img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+                    screen.blit(img, (rect.x + 5, rect.y + 5))
+                    font = pygame.font.SysFont(None, 22)
+                    count_surface = font.render(str(count), True, (255, 255, 255))
+                    screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
 
         if self.notification and pygame.time.get_ticks() - self.notification_time < 2000:
             notif_img, _ = self.notification
             screen.blit(notif_img, (20, 20))
+
 
     def draw_full_inventory(self, screen):
         width = 600
@@ -75,19 +79,20 @@ class Inventory:
 
         item_list = list(self.items.items())
         for i, (name, count) in enumerate(item_list):
-            item = Config.RESOURCE_ITEMS[name]
-            row = i // cols
-            col = i % cols
-            x = start_x + col * (slot_size + padding)
-            y = start_y + row * (slot_size + padding)
+            if count > 0:  # Only draw the item if count is greater than 0
+                item = Config.RESOURCE_ITEMS[name]
+                row = i // cols
+                col = i % cols
+                x = start_x + col * (slot_size + padding)
+                y = start_y + row * (slot_size + padding)
 
-            rect = pygame.Rect(x, y, slot_size, slot_size)
-            pygame.draw.rect(screen, (180, 180, 180), rect, 2)
-            img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-            screen.blit(img, (x + 5, y + 5))
+                rect = pygame.Rect(x, y, slot_size, slot_size)
+                pygame.draw.rect(screen, (180, 180, 180), rect, 2)
+                img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+                screen.blit(img, (x + 5, y + 5))
 
-            count_surf = font.render(str(count), True, (255, 255, 255))
-            screen.blit(count_surf, (x + slot_size - 20, y + slot_size - 20))
+                count_surf = font.render(str(count), True, (255, 255, 255))
+                screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
 
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)

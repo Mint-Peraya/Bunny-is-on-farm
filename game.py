@@ -34,7 +34,6 @@ class Game:
         self.portal_cooldown = 30  # Add cooldown to prevent immediate return
         self.update_camera(instant=True)
 
-
     def warp_to_maze(self):
         self.fade_transition()
         self.bunny.mode = 'maze'
@@ -357,7 +356,5 @@ class Game:
         print(f"Game saved for {username}")
 
 
-
 if __name__ == "__main__":
-    # Game().run()
-    Game().save_game()
+    Game().run()
