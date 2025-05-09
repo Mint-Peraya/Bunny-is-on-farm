@@ -99,7 +99,8 @@ class Inventory:
 
 
 class Bunny:
-    def __init__(self, x, y, mode='farm'):
+    def __init__(self, x, y, mode='farm',username = 'Unknown'):
+        self.name = username
         self.x, self.y = x, y
         self.health = 100
         self.speed = 0.1

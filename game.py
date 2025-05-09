@@ -315,8 +315,49 @@ class Game:
             time_taken = (end_time - self.dungeon_start_time) / 1000
             self.log_to_csv(time_taken, self.success)
     
-    def save_game():
-        pass
+    def save_game(self):
+        """Save current user's game state into a shared JSON file for all users."""
+        try:
+            with open('save_game.json', 'r') as f:
+                all_saves = json.load(f)
+        except FileNotFoundError:
+            all_saves = {}
+
+
+        username = self.bunny.name
+
+        user_save = {
+            "Day": self.farm.calendar.current_date,
+            "Date": self.farm.calendar.current_day_name,  # e.g., "Mon", "Tue"
+            "Season": self.farm.calendar.current_season,
+            "Time": "7:00",  # Reset daily
+            "Health": self.bunny.health,
+            "CropStatus": [
+                {
+                    "x": x,
+                    "y": y,
+                    "type": tile.plant.type if tile.plant else None,
+                    "stage": tile.plant.stage if tile.plant else None,
+                    "watered": tile.watered
+                }
+                for y, row in enumerate(self.farm.tiles)
+                for x, tile in enumerate(row)
+                if tile.type == 'dirt' and (tile.dug or tile.plant)
+            ],
+            "Inventory": self.bunny.inventory.items,
+            "Money": getattr(self.bunny, "money", 0),
+            "Relationship": getattr(self.bunny, "relationships", {})
+        }
+
+        all_saves[username] = user_save
+
+        with open('Data/save_game.json', 'w') as f:
+            json.dump(all_saves, f, indent=4)
+
+        print(f"Game saved for {username}")
+
+
 
 if __name__ == "__main__":
-    Game().run()
+    # Game().run()
+    Game().save_game()

@@ -113,6 +113,12 @@ class Tile:
         base_image = env_images.get(self.type, env_images['dirt'])
         screen.blit(pygame.transform.scale(base_image, (size, size)), (x, y))
 
+        # Draw soil overlay if dug
+        if self.dug and self.type == 'dirt':
+            soil_overlay = env_images.get('soil_overlay')
+            if soil_overlay:
+                screen.blit(pygame.transform.scale(soil_overlay, (size, size)), (x, y))
+
         # Draw plant if exists
         if self.plant:
             self.plant.draw(screen, x, y, size)
@@ -198,25 +204,6 @@ class Farm:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
         
-
-
-class Plant:
-    def __init__(self, growth_stages, grow_time=300):
-        self.growth_stages = growth_stages  # list of images or colors
-        self.grow_time = grow_time  # ms per stage
-        self.stage = 0
-        self.planted_time = pygame.time.get_ticks()
-
-    def update(self):
-        now = pygame.time.get_ticks()
-        if self.stage < len(self.growth_stages) - 1:
-            if now - self.planted_time > self.grow_time:
-                self.stage += 1
-                self.planted_time = now
-
-    def draw(self, screen, x, y, tile_size):
-        color = self.growth_stages[self.stage]
-        pygame.draw.rect(screen, color, (x, y, tile_size, tile_size))
 
 class Plant:
     def __init__(self, crop_type, growth_images):
