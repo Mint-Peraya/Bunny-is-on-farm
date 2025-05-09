@@ -106,15 +106,46 @@ class Tile:
     def update(self):
         if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
             self.watered = False
+ 
+    def harvest(self, bunny):
+        if self.plant and self.plant.harvestable:
+            result = self.plant.harvest()
+            if result:
+                item, amount = result
+                bunny.add_to_inventory(item, amount)
+                self.plant = None
+                return True
+        return False
 
 
 class Farm:
-    def __init__(self, width=50, height=30):  # Remove game parameter
+    def __init__(self, width=50, height=30):
         self.width = width
         self.height = height
         self.tiles = [[Tile('dirt', x, y) for x in range(width)] for y in range(height)]
         self.interactables = []
+        self.calendar = Calendar()  # Add calendar
         self._generate_terrain()
+
+    def update(self):
+        current_time = pygame.time.get_ticks()
+        
+        # Only update calendar once per frame
+        prev_season = self.calendar.current_season
+        self.calendar.update()
+        
+        if prev_season != self.calendar.current_season:
+            self.bunny.inventory.show_notification(
+                f"Season changed to {self.calendar.current_season}!",
+                (200, 200, 100)
+            )
+        
+        # Only update plants every 100ms to reduce lag
+        if current_time % 100 < 16:  # Roughly 10 times per second
+            for row in self.tiles:
+                for tile in row:
+                    if tile.plant:
+                        tile.plant.update(self.calendar.current_season)
         
     def _generate_terrain(self):
         """Generate trees, stones, and other terrain features"""
@@ -136,10 +167,7 @@ class Farm:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
             self.game.bunny.check_for_interaction(self.interactables, self.game)
 
-    def update(self):
-        for obj in self.interactables:
-            if hasattr(obj, 'update'):
-                obj.update()
+
 
     def draw(self, screen, camera_x, camera_y):
         # Draw tiles
@@ -171,3 +199,114 @@ class Plant:
     def draw(self, screen, x, y, tile_size):
         color = self.growth_stages[self.stage]
         pygame.draw.rect(screen, color, (x, y, tile_size, tile_size))
+
+# In farm.py - Update Plant class
+class Plant:
+    CROP_TYPES = {
+        "carrot": {
+            "stages": 4,
+            "grow_time": 3000,  # per stage
+            "seasons": ["Spring", "Fall"],
+            "harvest_item": "carrot",
+            "harvest_amount": 2
+        },
+        "wheat": {
+            "stages": 5,
+            "grow_time": 5000,
+            "seasons": ["Summer"],
+            "harvest_item": "wheat",
+            "harvest_amount": 3
+        },
+        "pumpkin": {
+            "stages": 6,
+            "grow_time": 7000,
+            "seasons": ["Fall"],
+            "harvest_item": "pumpkin",
+            "harvest_amount": 1
+        },
+        "potato": {
+            "stages": 4,
+            "grow_time": 4000,
+            "seasons": ["Spring", "Summer"],
+            "harvest_item": "potato",
+            "harvest_amount": 3
+        }
+    }
+
+    def __init__(self, crop_type, growth_images):
+        self.crop_type = crop_type
+        self.config = self.CROP_TYPES[crop_type]
+        self.growth_images = growth_images
+        self.stage = 0
+        self.max_stage = self.config["stages"] - 1
+        self.planted_time = pygame.time.get_ticks()
+        self.harvestable = False
+        
+    def update(self, current_season):
+        now = pygame.time.get_ticks()
+        
+        # Growth stops in wrong season
+        if current_season not in self.config["seasons"]:
+            return
+            
+        if self.stage < self.max_stage:
+            if now - self.planted_time > self.config["grow_time"]:
+                self.stage += 1
+                self.planted_time = now
+                if self.stage == self.max_stage:
+                    self.harvestable = True
+
+    def draw(self, screen, x, y, tile_size):
+        stage_img = self.growth_images[self.stage]
+        scaled_img = pygame.transform.scale(stage_img, (tile_size, tile_size))
+        screen.blit(scaled_img, (x, y))
+        
+    def harvest(self):
+        if self.harvestable:
+            self.harvestable = False
+            return (self.config["harvest_item"], self.config["harvest_amount"])
+        return None
+
+class Calendar:
+    def __init__(self):
+        self.seasons = ["Spring", "Summer", "Fall", "Winter"]
+        self.days_of_week = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+        self.current_season_index = 0
+        self.current_day = 0  # 0-6 (Sunday-Saturday)
+        self.current_date = 1  # 1-28
+        self.day_timer = 0
+        self.day_duration = 60000  # 60 seconds per day (adjust as needed)
+        self.last_update_time = 0  # Initialize to 0
+        
+    def update(self):
+        current_time = pygame.time.get_ticks()
+        if self.last_update_time == 0:  # First update
+            self.last_update_time = current_time
+            return
+            
+        delta_time = current_time - self.last_update_time
+        self.last_update_time = current_time
+        
+        self.day_timer += delta_time
+        if self.day_timer >= self.day_duration:
+            self.day_timer = 0
+            self.advance_day()
+            
+    def advance_day(self):
+        self.current_day = (self.current_day + 1) % 7
+        self.current_date += 1
+        if self.current_date > 28:
+            self.current_date = 1
+            self.current_season_index = (self.current_season_index + 1) % 4
+            print(f"Season changed to {self.current_season}")
+            
+    @property
+    def current_season(self):
+        return self.seasons[self.current_season_index]
+        
+    @property
+    def current_day_name(self):
+        return self.days_of_week[self.current_day]
+        
+    def get_date_string(self):
+        return f"{self.current_day_name}, Day {self.current_date} of {self.current_season}"

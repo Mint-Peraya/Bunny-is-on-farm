@@ -97,13 +97,12 @@ class Game:
         self.dungeon = Dungeon(30, 30, self.bunny)  # Reinitialize dungeon
 
     def handle_interactions(self):
-        """Handle all interaction logic"""
         front_x, front_y = self.bunny.get_front_position()
         world = self.maze if self.bunny.mode == 'maze' else self.farm
         
-        # Check for tile interactions in farm mode
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
             tile = self.farm.tiles[front_y][front_x]
+            
             if tile.type == 'tree':
                 self.bunny.start_action('cut', tile)
             elif tile.type == 'stone':
@@ -111,24 +110,25 @@ class Game:
             elif tile.type == 'dirt':
                 if not tile.dug:
                     self.bunny.start_action('dig', tile)
-                elif tile.dug and tile.plant is None and self.bunny.held_item == 'seed':
-                    if self.bunny.inventory.items["seed"] > 0:
-                        stages = [Config.get('red'),Config.get('green'),Config.get('blue')]
-                        tile.plant = Plant(stages)
-                        self.bunny.inventory.items["seed"] -= 1
-                        self.bunny.inventory.show_notification("Planted a seed!", (0, 255, 0))
-                elif tile.dug and self.bunny.held_item != 'seed':
+                elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
+                    crop_type = self.bunny.held_item.replace("_seed", "")
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.items.get(self.bunny.held_item, 0) > 0:
+                        # Get all stages for this crop
+                        stages = []
+                        for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
+                            stage_img = Config.get('environ')[f'{crop_type}_stage{i}']
+                            if stage_img:
+                                stages.append(stage_img)
+                        
+                        if stages:  # Only plant if we have all required stages
+                            tile.plant = Plant(crop_type, stages)
+                            self.bunny.inventory.items[self.bunny.held_item] -= 1
+                            self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
+                elif tile.dug and tile.plant and tile.plant.harvestable:
+                    self.bunny.harvest_crop(self.farm)
+                elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
                     tile.water()
                     self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
-
-        
-        # Check for portal interactions
-        portals = [self.farm_portal] if self.bunny.mode == 'farm' else [self.maze_enterportal, self.maze_exitportal]
-        for portal in portals:
-            if portal.check_collision(self.bunny) and self.portal_cooldown <= 0:
-                portal.teleport(self)
-                self.portal_cooldown = 50000
-                break
 
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
@@ -166,6 +166,11 @@ class Game:
         # Draw inventory
         self.bunny.inventory.draw(self.screen)
         
+        # Draw Day
+        if self.bunny.mode == 'farm':
+            date_text = self.farm.calendar.get_date_string()
+            self.draw_text(date_text, 25, Config.get('white'), (10, 100))
+
         # Draw compass in maze mode
         if self.bunny.mode == 'maze' and not self.game_over:
             self.maze.draw_compass(self.screen, self.bunny, self.exit)
@@ -225,7 +230,7 @@ class Game:
     def log_to_csv(self, time_taken, success):
         """Log game results (time, success/failure) into CSV file"""
         print(f"Logging to CSV: Time taken = {time_taken}, Success = {success}")  # Debugging line
-        with open('maze_log.csv', mode='a', newline='') as file:
+        with open('Data/maze_log.csv', mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([time_taken, success])
 

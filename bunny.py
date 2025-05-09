@@ -3,14 +3,16 @@ import math,random
 from config import *
 from collections import defaultdict
 
-
 class Inventory:
-    def __init__(self, capacity=5):
+    def __init__(self, capacity=10):  # Increased capacity
         self.capacity = capacity
-        self.items = defaultdict(int)  # {item_name: count}
+        self.items = defaultdict(int)
+        # Start with some seeds
+        self.items["carrot_seed"] = 5
         self.notification = None
         self.notification_time = 0
         self.full_view = False  # For toggling full inventory screen
+
 
     def is_full(self):
         return sum(self.items.values()) >= self.capacity
@@ -358,3 +360,17 @@ class Bunny:
         for _ in range(amount):
             if item_name in Config.RESOURCE_ITEMS:
                 self.inventory.add_item(Config.RESOURCE_ITEMS[item_name])
+
+    def harvest_crop(self, farm):
+        front_x, front_y = self.get_front_position()
+        if 0 <= front_x < farm.width and 0 <= front_y < farm.height:
+            tile = farm.tiles[front_y][front_x]
+            if tile.plant and tile.plant.harvestable:
+                if tile.harvest(self):
+                    self.inventory.show_notification("Harvested crop!", (200, 200, 0))
+                else:
+                    self.inventory.show_notification("Not ready to harvest!", (255, 100, 0))
+            elif tile.plant:
+                self.inventory.show_notification("Crop still growing...", (100, 255, 100))
+            else:
+                self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))

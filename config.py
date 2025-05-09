@@ -1,4 +1,5 @@
 import pygame
+import random
 
 class Frame:
     def __init__(self, image):
@@ -10,7 +11,7 @@ class Frame:
         image = pygame.transform.scale(image, (width * scale, height * scale))
         image.set_colorkey(colour)
         return image
-    
+
 # Initialize pygame before loading images
 pygame.init()
 pygame.display.set_mode((1, 1))
@@ -23,86 +24,120 @@ class ResourceItem:
         except:
             self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
             self.image.fill((50, 50, 50, 255))  # dark gray background
-
-            # Render the name on the fallback surface
             font = pygame.font.SysFont("arial", 10, bold=True)
-            text_surface = font.render(self.name, True, (255, 255, 255))  # white text
-
-            # Center the text
+            text_surface = font.render(self.name, True, (255, 255, 255))
             text_rect = text_surface.get_rect(center=(16, 16))
             self.image.blit(text_surface, text_rect)
 
-
 class Config:
     """Configuration class to store game settings and images."""
-    # Store basic configurations
     __ALL_CONFIGS = {
         'window': (800, 600),
         'wx': 800,
         'wy': 600,
-        'FPS': 60,
         'bun_size': 64,
         'bun_exact': 32,
         'black': (0, 0, 0),
         'white': (255, 255, 255),
-        'gray':(70,70,70),
+        'gray': (70, 70, 70),
         'red': (255, 0, 0),
         'green': (0, 255, 0),
         'peach': (255, 200, 200),
         'sky': (200, 255, 255),
         'purple': (200, 0, 210),
-        'dark_purple':(52, 0, 112),
-        'brown': (60,5,25),
-        'maze': 50 * 64,  # Maze size (50x50 grid)
+        'dark_purple': (52, 0, 112),
+        'brown': (60, 5, 25),
+        'maze': 50 * 64,
         'grid': 50,
         'yellow': (200, 200, 0),
-        'font':"assets/fonts/pixel.ttf",
+        'font': "assets/fonts/pixel.ttf",
         'FPS': 60,
-        'environ':{
-        'dirt': pygame.image.load('assets/picture/grass1.png').convert_alpha(),
-        'soil_overlay': pygame.image.load('assets/picture/soil_overlay.png').convert_alpha(),
-        'tree': pygame.image.load('assets/picture/tree.png').convert_alpha(),
-        'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
-    }}
+        'environ': {
+            'dirt': None,
+            'soil_overlay': None,
+            'tree': None,
+            'stone': None,
+            'carrot_stage1': None,
+            'carrot_stage2': None,
+            'carrot_stage3': None,
+        }
+    }
 
-    # config.py - Add to RESOURCE_ITEMS
     RESOURCE_ITEMS = {
         "wood": ResourceItem("wood", "assets/items/wood.png"),
         "stone": ResourceItem("stone", "assets/items/stone.png"),
         "carrot": ResourceItem("carrot", "assets/items/carrot.png"),
         "axe": ResourceItem("axe", "assets/items/axe.png"),
         "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
-        "seed": ResourceItem("seed", "assets/items/seed.png")
+        "seed": ResourceItem("seed", "assets/items/seed.png"),
+        "carrot_seed": ResourceItem("carrot seed", "assets/plants/carrot_seed.png"),
     }
 
-    # Store images separately to prevent premature loading
-    __bun_sheet = {}
+    PLANT_CONFIG = {
+        "carrot": {
+            "stages": 3,
+            "grow_time": 1000,
+            "seasons": ["Spring", "Fall"],
+            "harvest_item": "carrot",
+            "harvest_amount": 2,
+            "stage_images": [
+                'carrot_stage1',
+                'carrot_stage2',
+                'carrot_stage3'
+            ]
+        }
+    }
 
+    __bun_sheet = {}
     @classmethod
     def load_images(cls):
-        """Load images and store them in the dictionary."""
-        cls.__bun_sheet = {
-            'front_sheet': Frame(pygame.image.load('assets/picture/BunnyWalk-Sheet.png').convert_alpha()),
-            'back_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkBack-Sheet.png').convert_alpha()),
-            'right_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkright-Sheet.png').convert_alpha()),
-            'left_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkleft-Sheet.png').convert_alpha()),
-            'front_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_front_damage.png').convert_alpha()),
-            'back_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_back_damage.png').convert_alpha()),
-            'left_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_left_damage.png').convert_alpha()),
-            'right_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_right_damage.png').convert_alpha())
-        }
-    
- 
+        """Load all game images with error handling"""
+        # Environment images
+        try:
+            cls.__ALL_CONFIGS['environ']['dirt'] = pygame.image.load('assets/picture/grass1.png').convert_alpha()
+            cls.__ALL_CONFIGS['environ']['soil_overlay'] = pygame.image.load('assets/picture/soil_overlay.png').convert_alpha()
+            cls.__ALL_CONFIGS['environ']['tree'] = pygame.image.load('assets/picture/tree.png').convert_alpha()
+            cls.__ALL_CONFIGS['environ']['stone'] = pygame.image.load('assets/picture/stone.png').convert_alpha()
+            
+            # Plant stages - verify each image loads
+            for crop, config in cls.PLANT_CONFIG.items():
+                for i, stage in enumerate(config["stage_images"]):
+                    try:
+                        cls.__ALL_CONFIGS['environ'][stage] = pygame.image.load(f'assets/plants/{crop}_stage{i+1}.png').convert_alpha()
+                    except:
+                        print(f"Failed to load {stage} image")
+                        # Create a placeholder
+                        surf = pygame.Surface((32, 32), pygame.SRCALPHA)
+                        surf.fill((random.randint(0,255), random.randint(0,255), random.randint(0,255)))
+                        cls.__ALL_CONFIGS['environ'][stage] = surf
+        except Exception as e:
+            print(f"Error loading images: {e}")
+
+        # Bunny sprites
+        try:
+            cls.__bun_sheet = {
+                'front_sheet': Frame(pygame.image.load('assets/picture/BunnyWalk-Sheet.png').convert_alpha()),
+                'back_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkBack-Sheet.png').convert_alpha()),
+                'right_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkright-Sheet.png').convert_alpha()),
+                'left_sheet': Frame(pygame.image.load('assets/picture/BunnyWalkleft-Sheet.png').convert_alpha()),
+                'front_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_front_damage.png').convert_alpha()),
+                'back_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_back_damage.png').convert_alpha()),
+                'left_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_left_damage.png').convert_alpha()),
+                'right_damage_sheet': Frame(pygame.image.load('assets/picture/bunny_right_damage.png').convert_alpha())
+            }
+        except Exception as e:
+            print(f"Error loading bunny sprites: {e}")
 
     @classmethod
     def get(cls, key):
         """Retrieve a configuration value by key."""
         if key == 'bun_sheet':
-            return cls.__bun_sheet  # Return images separately
-        return cls.__ALL_CONFIGS.get(key, None)  # Return other settings
+            return cls.__bun_sheet
+        return cls.__ALL_CONFIGS.get(key, None)
 
-# Load images once before the game starts
+# Load images when the module is imported
 Config.load_images()
+
 
 class BigScene:  
     def __init__(self,screen,clock,story_text, font, font_size, typing_speed=0.03):
