@@ -3,105 +3,6 @@ import math,random
 from config import *
 from collections import defaultdict
 
-class Inventory:
-    def __init__(self, capacity=5):  # Increased capacity
-        self.capacity = capacity
-        self.items = defaultdict(int)
-        # Start with some seeds
-        self.items["carrot_seed"] = 5
-        self.notification = None
-        self.notification_time = 0
-        self.full_view = False  # For toggling full inventory screen
-
-
-    def is_full(self):
-        # Return True if the number of unique items exceeds the capacity
-        return len(self.items) >= self.capacity
-
-    def add_item(self, item):
-        if len(self.items) < self.capacity:  # Check if there's space for new items
-            self.items[item.name] += 1
-            if self.items[item.name] <= 0:  # If count reaches zero, delete the item
-                del self.items[item.name]
-            self.show_notification(f"Picked up {item.name}", (0, 255, 0))
-            return True
-        self.show_notification("Inventory Full!", (255, 0, 0))
-        return False
-
-    def draw(self, screen):
-        if self.full_view:
-            self.draw_full_inventory(screen)
-        else:
-            self.draw_quick_bar(screen)
-
-    def draw_quick_bar(self, screen):
-        slot_size = 64
-        padding = 5
-        start_x = (screen.get_width() - (slot_size + padding) * self.capacity) // 2
-        y = screen.get_height() - slot_size - 10
-
-        item_list = list(self.items.items())
-        for i in range(self.capacity):
-            rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
-            pygame.draw.rect(screen, (200, 200, 200), rect, 2)
-
-            if i < len(item_list):
-                name, count = item_list[i]
-                if count > 0:  # Only draw the item if count is greater than 0
-                    item = Config.RESOURCE_ITEMS[name]
-                    img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-                    screen.blit(img, (rect.x + 5, rect.y + 5))
-                    font = pygame.font.SysFont(None, 22)
-                    count_surface = font.render(str(count), True, (255, 255, 255))
-                    screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
-
-        if self.notification and pygame.time.get_ticks() - self.notification_time < 2000:
-            notif_img, _ = self.notification
-            screen.blit(notif_img, (20, 20))
-
-
-    def draw_full_inventory(self, screen):
-        width = 600
-        height = 300
-        box = pygame.Rect((screen.get_width() - width) // 2, (screen.get_height() - height) // 2, width, height)
-        pygame.draw.rect(screen, (50, 50, 50), box)
-        pygame.draw.rect(screen, (200, 200, 200), box, 4)
-
-        font = pygame.font.SysFont(None, 28)
-        title = font.render("Inventory", True, (255, 255, 255))
-        screen.blit(title, (box.x + 20, box.y + 10))
-
-        slot_size = 50
-        padding = 10
-        cols = 6
-        start_x = box.x + 20
-        start_y = box.y + 50
-
-        item_list = list(self.items.items())
-        for i, (name, count) in enumerate(item_list):
-            if count > 0:  # Only draw the item if count is greater than 0
-                item = Config.RESOURCE_ITEMS[name]
-                row = i // cols
-                col = i % cols
-                x = start_x + col * (slot_size + padding)
-                y = start_y + row * (slot_size + padding)
-
-                rect = pygame.Rect(x, y, slot_size, slot_size)
-                pygame.draw.rect(screen, (180, 180, 180), rect, 2)
-                img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-                screen.blit(img, (x + 5, y + 5))
-
-                count_surf = font.render(str(count), True, (255, 255, 255))
-                screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
-
-    def show_notification(self, text, color):
-        font = pygame.font.SysFont(None, 30)
-        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
-        self.notification_time = pygame.time.get_ticks()
-
-    def toggle_inventory_view(self):
-        self.full_view = not self.full_view
-
 
 class Bunny:
     def __init__(self, x, y, mode='farm',username = 'Unknown'):
@@ -171,19 +72,19 @@ class Bunny:
         """Finish the current action"""
         if self.current_action == 'cut' and self.action_target.type == 'tree':
             self.add_to_inventory('wood')
-            self.action_target.type = 'stump'
+            self.action_target.type = 'dirt'
             self.action_target.health = 0
 
-            # 🎲 Add chance to drop a seed
-            if random.random() < 0.5:  # 30% chance
-                self.add_to_inventory('seed')
-                self.inventory.show_notification("You got a seed!", (200, 255, 100))
 
         elif self.current_action == 'mine' and self.action_target.type == 'stone':
             self.add_to_inventory('stone')
             self.action_target.type = 'dirt'
         elif self.current_action == 'dig' and self.action_target.type == 'dirt':
             self.action_target.dig()
+            # 🎲 Add chance to drop a seed
+            if random.random() < 0.5:  # 30% chance
+                self.add_to_inventory('seed')
+                self.inventory.show_notification("You got a seed!", (200, 255, 100))
 
         self.current_action = None
         self.action_target = None
@@ -380,3 +281,230 @@ class Bunny:
                 self.inventory.show_notification("Crop still growing...", (100, 255, 100))
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
+
+
+class Inventory:
+    def __init__(self, capacity=5):  # Increased capacity
+        self.capacity = capacity
+        self.items = defaultdict(int)
+        # Start with some seeds
+        self.items["carrot_seed"] = 5
+        self.notification = None
+        self.notification_time = 0
+        self.full_view = False  # For toggling full inventory screen
+
+
+    def is_full(self):
+        # Return True if the number of unique items exceeds the capacity
+        return len(self.items) >= self.capacity
+
+    def add_item(self, item):
+        if len(self.items) < self.capacity:  # Check if there's space for new items
+            self.items[item.name] += 1
+            if self.items[item.name] <= 0:  # If count reaches zero, delete the item
+                del self.items[item.name]
+            self.show_notification(f"Picked up {item.name}", (0, 255, 0))
+            return True
+        self.show_notification("Inventory Full!", (255, 0, 0))
+        return False
+
+    def draw(self, screen):
+        if self.full_view:
+            self.draw_full_inventory(screen)
+        else:
+            self.draw_quick_bar(screen)
+
+    def draw_quick_bar(self, screen):
+        slot_size = 64
+        padding = 5
+        start_x = (screen.get_width() - (slot_size + padding) * self.capacity) // 2
+        y = screen.get_height() - slot_size - 10
+
+        item_list = list(self.items.items())
+        for i in range(self.capacity):
+            rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
+            pygame.draw.rect(screen, (200, 200, 200), rect, 2)
+
+            if i < len(item_list):
+                name, count = item_list[i]
+                if count > 0:  # Only draw the item if count is greater than 0
+                    item = Config.RESOURCE_ITEMS[name]
+                    img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+                    screen.blit(img, (rect.x + 5, rect.y + 5))
+                    font = pygame.font.SysFont(None, 22)
+                    count_surface = font.render(str(count), True, (255, 255, 255))
+                    screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
+
+        if self.notification and pygame.time.get_ticks() - self.notification_time < 2000:
+            notif_img, _ = self.notification
+            screen.blit(notif_img, (20, 20))
+
+
+    def draw_full_inventory(self, screen):
+        width = 600
+        height = 300
+        box = pygame.Rect((screen.get_width() - width) // 2, (screen.get_height() - height) // 2, width, height)
+        pygame.draw.rect(screen, (50, 50, 50), box)
+        pygame.draw.rect(screen, (200, 200, 200), box, 4)
+
+        font = pygame.font.SysFont(None, 28)
+        title = font.render("Inventory", True, (255, 255, 255))
+        screen.blit(title, (box.x + 20, box.y + 10))
+
+        slot_size = 50
+        padding = 10
+        cols = 6
+        start_x = box.x + 20
+        start_y = box.y + 50
+
+        item_list = list(self.items.items())
+        for i, (name, count) in enumerate(item_list):
+            if count > 0:  # Only draw the item if count is greater than 0
+                item = Config.RESOURCE_ITEMS[name]
+                row = i // cols
+                col = i % cols
+                x = start_x + col * (slot_size + padding)
+                y = start_y + row * (slot_size + padding)
+
+                rect = pygame.Rect(x, y, slot_size, slot_size)
+                pygame.draw.rect(screen, (180, 180, 180), rect, 2)
+                img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+                screen.blit(img, (x + 5, y + 5))
+
+                count_surf = font.render(str(count), True, (255, 255, 255))
+                screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
+
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
+
+    def toggle_inventory_view(self):
+        self.full_view = not self.full_view
+
+
+class Stone:
+    def __init__(self, tile_x, tile_y, image_path='assets/items/stone.png'):
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+        self.health = 2  # Number of hits to destroy
+        self.image = pygame.image.load(image_path).convert_alpha()
+        self.rect = self.image.get_rect(topleft=(tile_x * 32, tile_y * 32))
+
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+
+    def interact(self, game):
+        self.health -= 1
+        print("You hit the stone! HP:", self.health)
+        if self.health <= 0:
+            print("Stone is destroyed! You got stone.")
+            game.inventory.add_item("stone")
+            game.farm.interactables.remove(self)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+
+class Tree:
+    def __init__(self, tile_x, tile_y, image_path='assets/items/tree.png'):
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+        self.health = 3  # Number of hits to destroy
+        self.image = pygame.image.load(image_path).convert_alpha()
+        self.rect = self.image.get_rect(topleft=(tile_x * 32, tile_y * 32))
+
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+    
+    def interact(self, game):
+        self.health -= 1
+        print("You chopped the tree! HP:", self.health)
+        if self.health <= 0:
+            print("Tree is gone! You got wood.")
+            game.inventory.add_item("wood")
+            game.farm.interactables.remove(self)
+
+    def draw(self, screen):
+        screen.blit(self.image, self.rect)
+
+
+class Portal:
+    def __init__(self, tile_x, tile_y, target_world='maze', target_pos=(1, 1)):
+        self.tile_x = tile_x
+        self.tile_y = tile_y
+        self.target_world = target_world
+        self.target_pos = target_pos
+        self.size = Config.get('bun_size')
+        self.interact_text = "Enter portal (SPACE)"
+        self.cooldown = 0  # Added cooldown timer
+
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+    
+    def draw_interaction(self, screen):
+        """Draw interaction prompt"""
+        if self.interact_text:
+            font = pygame.font.Font(Config.get('font'), 24)
+            text_surface = font.render(self.interact_text, True, Config.get('white'))
+            screen.blit(text_surface, (10, 10))
+
+    def check_collision(self, bunny):
+        """Check if bunny is touching the portal"""
+        portal_rect = pygame.Rect(
+            self.tile_x * self.size,
+            self.tile_y * self.size,
+            self.size,
+            self.size
+        )
+        return bunny.rect.colliderect(portal_rect)
+
+    def draw(self, screen, camera_x, camera_y):
+        """Draw the portal with pulsing effect"""
+        center_x = self.tile_x * self.size + self.size // 2 - camera_x
+        center_y = self.tile_y * self.size + self.size // 2 - camera_y
+        base_radius = self.size // 2 - 8
+
+        time = pygame.time.get_ticks() / 300
+        pulse = math.sin(time) * 3
+
+        for i in range(3):
+            aura_radius = base_radius + 6 + i * 4 + pulse
+            alpha = 50 - i * 15
+            aura_surf = pygame.Surface((aura_radius * 2, aura_radius * 2), pygame.SRCALPHA)
+            pygame.draw.circle(aura_surf, (*Config.get('dark_purple'), alpha),
+                             (aura_radius, aura_radius), int(aura_radius))
+            screen.blit(aura_surf, (center_x - aura_radius, center_y - aura_radius))
+
+        pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
+    
+    def teleport(self, game):
+        if self.cooldown <= 0:
+            if self.target_world == 'maze':
+                game.warp_to_maze()
+            else:
+                game.warp_to_farm()
+            self.cooldown = 30
+
+    def update(self):
+        if self.cooldown > 0:
+            self.cooldown -= 1
+
+    def interact(self, game):
+        self.teleport(game)
+

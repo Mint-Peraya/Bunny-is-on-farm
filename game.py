@@ -3,10 +3,20 @@ import csv
 import json
 from config import *
 from maze import Maze
-from bunny import Bunny
+from bunny import *
 from farm import *
-from object import *
 from dungeon import Dungeon 
+from stattk import *
+import tkinter as tk
+from tkinter import ttk
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import subprocess
+import sys
+import os
 
 
 class Game:
@@ -21,8 +31,10 @@ class Game:
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.reset_game()
-        self.bunny = Bunny(1, 1, mode='farm')  # Create the bunny object
+        self.bunny = Bunny(10, 10, mode='farm')  # Create the bunny object
         self.dungeon = Dungeon(30, 30, self.bunny)  # Pass the bunny into Dungeon
+
+        self.last_log_time = pygame.time.get_ticks()
 
     def warp_to_dungeon(self):
         """Transition to dungeon mode"""
@@ -144,11 +156,14 @@ class Game:
         """Render UI elements"""
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
         
-        # Draw HUD
+        # Draw Health
         self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
-        mode_text = f"Mode: {self.bunny.mode.capitalize()}"
-        self.draw_text(mode_text, 25, Config.get('white'), (10, 50))
         
+        # Draw day
+        pygame.draw.rect(self.screen, Config.get('brown'), (490, 10, 500, 30), 0,border_radius=10)
+        date_text = self.farm.calendar.get_date_string()
+        self.draw_text(date_text, 25, Config.get('sky'), (500, 10))
+
         # Draw interaction prompt if near something
         if self.bunny.current_interactable:
             if hasattr(self.bunny.current_interactable, 'interact_text'):
@@ -165,11 +180,8 @@ class Game:
         
         # Draw inventory
         self.bunny.inventory.draw(self.screen)
+
         
-        # Draw Day
-        if self.bunny.mode == 'farm':
-            date_text = self.farm.calendar.get_date_string()
-            self.draw_text(date_text, 25, Config.get('white'), (10, 100))
 
         # Draw compass in maze mode
         if self.bunny.mode == 'maze' and not self.game_over:
@@ -257,18 +269,15 @@ class Game:
         self.render_ui()
         pygame.display.flip()
 
-    def run(self):
-        """Main game loop"""
-        while self.running:
-            self.handle_events()
-            self.update()
-            self.render()
-            self.clock.tick(60)
-        pygame.quit()
-
     def update(self):
         """Update the game state based on current mode"""
         keys = pygame.key.get_pressed()
+                # Check if 10 seconds have passed since the last log
+        current_time = pygame.time.get_ticks()
+        if current_time - self.last_log_time >= 5000:  # 5 seconds = 5000 ms
+            self.log_bunny_position()
+            self.last_log_time = current_time  # Update the time of the last log
+
         
         # Determine current world based on mode
         if self.bunny.mode == 'maze':
@@ -329,6 +338,7 @@ class Game:
             "Day": self.farm.calendar.current_date,
             "Date": self.farm.calendar.current_day_name,  # e.g., "Mon", "Tue"
             "Season": self.farm.calendar.current_season,
+            "Year":self.farm.calendar.current_year,
             "Time": "7:00",  # Reset daily
             "Health": self.bunny.health,
             "CropStatus": [
@@ -355,6 +365,36 @@ class Game:
 
         print(f"Game saved for {username}")
 
+    def log_bunny_position(self):
+        """Log bunny's (x, y) position to a CSV file."""
+        with open('Data/bunny_positions.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([round(self.bunny.x), round(self.bunny.y)])
+
+    def end_game(self):
+        """End the game and show statistics"""
+        print("Game ended. Opening StatsApp...")
+        pygame.quit()
+        
+        # Launch stats app as separate process
+        stats_script = os.path.join(os.path.dirname(__file__), 'stattk.py')
+        subprocess.Popen([sys.executable, stats_script])
+        sys.exit(0)
+
+    def start_stats_app(self):
+        """Start the statistics application"""
+        root = tk.Tk()
+        app = StatsApp(root)
+        root.mainloop()
+
+    def run(self):
+        """Main game loop"""
+        while self.running:
+            self.handle_events()
+            self.update()
+            self.render()
+            self.clock.tick(60)
+        self.end_game()
 
 if __name__ == "__main__":
     Game().run()

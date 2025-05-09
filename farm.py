@@ -1,7 +1,7 @@
 import pygame
 import random
 from config import Config
-from object import *
+from bunny import *
 
 
 class Tile:
@@ -192,7 +192,6 @@ class Farm:
             self.game.bunny.check_for_interaction(self.interactables, self.game)
 
 
-
     def draw(self, screen, camera_x, camera_y):
         # Draw tiles
         for y in range(self.height):
@@ -250,6 +249,7 @@ class Calendar:
         self.current_season_index = 0
         self.current_day = 0
         self.current_date = 1
+        self.current_year = 1
         self.day_timer = 0
         self.day_duration = 60000  # 60 seconds per day
         self.last_update_time = pygame.time.get_ticks()
@@ -270,6 +270,8 @@ class Calendar:
         if self.current_date > 28:
             self.current_date = 1
             self.current_season_index = (self.current_season_index + 1) % 4
+            if self.current_season_index % 4 == 0 :
+                self.current_year += 1
             
     @property
     def current_season(self):
@@ -280,6 +282,6 @@ class Calendar:
         return self.days_of_week[self.current_day]
         
     def get_date_string(self):
-        return f"{self.current_day_name}, Day {self.current_date} of {self.current_season}"
+        return f"{self.current_day_name} {self.current_date}, {self.current_season}, Year {self.current_year}"
     
         i

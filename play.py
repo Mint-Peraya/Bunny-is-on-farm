@@ -1,4 +1,5 @@
 from game import Game
+from stattk import *
 from login import *
 
 if __name__ == "__main__":
