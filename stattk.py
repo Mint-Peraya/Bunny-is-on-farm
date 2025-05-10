@@ -64,24 +64,39 @@ class StatsApp(tk.Tk):
         self.display_plot(fig)
 
     def show_kdr_boxplot(self):
-        # Clear the previous graph
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        # Clear previous plot
         self.clear_graph_frame()
 
-        # Create and display the KDR boxplot
-        data = {
-            'Enemy Type': ['Goblin', 'Goblin', 'Goblin', 'Goblin', 'Orc', 'Orc', 'Orc', 'Orc', 'Dragon', 'Dragon', 'Dragon'],
-            'Kills': [10, 20, 15, 30, 25, 35, 40, 50, 100, 110, 120],
-            'Deaths': [5, 7, 6, 8, 10, 12, 9, 15, 50, 55, 60]
-        }
-        df = pd.DataFrame(data)
-        df['KDR'] = df['Kills'] / df['Deaths']
-        fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size (6x4 inches)
-        
-        sns.boxplot(x='Enemy Type', y='KDR', data=df, hue='Enemy Type', palette='Set2', ax=ax, legend=False)
+        # Load data
+        df = pd.read_csv("Data/Enemy_difficulty.csv")
+
+        df['Session'] = (df.index // 10) + 1  # 10 events per session
+
+        # Count kills/faints per enemy per session
+        grouped = df.groupby(['Session', 'Enemy Type', 'Kills/Deaths']).size().unstack(fill_value=0)
+
+        # Make sure both columns exist
+        if 'kill' not in grouped.columns:
+            grouped['kill'] = 0
+        if 'fainted' not in grouped.columns:
+            grouped['fainted'] = 0
+
+        # Calculate KDR per session per enemy type
+        grouped['KDR'] = grouped['kill'] / grouped['fainted'].replace(0, 1)
+        grouped = grouped.reset_index()
+
+        # Plot boxplot
+        fig, ax = plt.subplots(figsize=(3, 2))
+        sns.boxplot(x='Enemy Type', y='KDR', data=grouped, palette='Set2', ax=ax)
 
         ax.set_title('Enemy Difficulty (KDR per Type)')
         ax.set_xlabel('Enemy Type')
         ax.set_ylabel('KDR Value')
+
         self.display_plot(fig)
 
     def show_cropbar(self):
