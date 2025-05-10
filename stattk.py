@@ -91,7 +91,7 @@ class StatsApp(tk.Tk):
 
         # Plot boxplot
         fig, ax = plt.subplots(figsize=(3, 2))
-        sns.boxplot(x='Enemy Type', y='KDR', data=grouped, palette='Set2', ax=ax)
+        sns.boxplot(x='Enemy Type', y='KDR', data=grouped, hue='Enemy Type', palette='Set2', ax=ax)
 
         ax.set_title('Enemy Difficulty (KDR per Type)')
         ax.set_xlabel('Enemy Type')
@@ -100,23 +100,27 @@ class StatsApp(tk.Tk):
         self.display_plot(fig)
 
     def show_cropbar(self):
-        # Clear the previous graph
+        import pandas as pd
+        import matplotlib.pyplot as plt
+
         self.clear_graph_frame()
 
-        # Create and display the crop preference bar chart
-        data = {
-            'Session Week': ['Week 1', 'Week 2', 'Week 3', 'Week 4', 'Week 5'],
-            'Wheat': [10, 15, 12, 20, 25],
-            'Corn': [5, 7, 9, 8, 10],
-            'Carrot': [2, 3, 4, 3, 2]
-        }
-        df = pd.DataFrame(data)
-        df.set_index('Session Week', inplace=True)
-        fig, ax = plt.subplots(figsize=(4, 3))  # Smaller size (6x4 inches)
-        df.plot(kind='bar', stacked=True, figsize=(4, 3), cmap='Set3', ax=ax)  # Adjusted size
-        ax.set_title('Crop Type Preference (Stacked by Type)')
-        ax.set_xlabel('Session Week')
-        ax.set_ylabel('Crop Count (stacked by type)')
+        # Load data
+        df = pd.read_csv("Data/Crop.csv", header=None, names=["Week", "Crop", "Amount"])
+        df["Amount"] = pd.to_numeric(df["Amount"], errors='coerce')
+
+        # Group by Week and Crop, then normalize to proportions
+        grouped = df.groupby(['Week', 'Crop'])['Amount'].sum().unstack(fill_value=0)
+        proportions = grouped.div(grouped.sum(axis=1), axis=0)  # Normalize to proportions
+
+        # Plot
+        fig, ax = plt.subplots(figsize=(3, 2))
+        proportions.plot(kind='bar', stacked=True, cmap='Set3', ax=ax)
+
+        ax.set_title("Crop Type Preference (Stacked Proportion)")
+        ax.set_xlabel("Session Week")
+        ax.set_ylabel("Proportion of Crop Types")
+        ax.legend(title="Crop Type", bbox_to_anchor=(1.05, 1), loc='upper left')
         self.display_plot(fig)
 
     def show_table(self):
@@ -124,33 +128,47 @@ class StatsApp(tk.Tk):
         self.clear_graph_frame()
 
         # Create and display the statistics table
-        player_positions = [(10, 10), (20, 15), (30, 20), (40, 30)]  # Example (x, y) coordinates
-        distances = [np.sqrt((player_positions[i][0] - player_positions[i-1][0])**2 +
-                             (player_positions[i][1] - player_positions[i-1][1])**2)
-                     for i in range(1, len(player_positions))]
+        player_positions = pd.read_csv("Data/bunny_positions.csv")
+        positions = player_positions[['x', 'y']].values  # Now it's a NumPy array
+
+        distances = [np.linalg.norm(positions[i] - positions[i - 1]) for i in range(1, len(positions))]
         average_movement = np.mean(distances)
 
-        kills = 50
-        deaths = 25
-        KDR = kills / deaths
+        enemy_df = pd.read_csv('Data/Enemy_difficulty.csv')
+        kdr_grouped = enemy_df.groupby(['Enemy Type', 'Kills/Deaths']).size().unstack(fill_value=0)
+        kdr_grouped['KDR'] = kdr_grouped['kill'] / kdr_grouped['fainted'].replace(0, 1)
 
-        harvested_crops = ['wheat', 'corn', 'wheat', 'corn', 'carrot', 'wheat']
-        crop_count = {crop: harvested_crops.count(crop) for crop in set(harvested_crops)}
+        crop_df = pd.read_csv('Data/Crop.csv')
+        crop_summary = crop_df.groupby("Crop")["Amount"].sum().to_dict()
 
-        combat_data = {'hits': [50, 80, 75, 90, 65], 'total_shots': [100, 100, 100, 100, 100]}
-        accuracies = [hit / total * 100 for hit, total in zip(combat_data['hits'], combat_data['total_shots'])]
-        mean_accuracy = np.mean(accuracies)
-        std_accuracy = np.std(accuracies)
+        # === Combat Accuracy ===
+        combat_df = pd.read_csv('Data/combat_accuracy.csv')
+        mean_acc = combat_df["Hit"].mean() * 100
+        std_acc = combat_df["Hit"].std() * 100
+
+
+        # KDR value from all enemies
+        total_kills = kdr_grouped.get('kill', pd.Series()).sum()
+        total_deaths = kdr_grouped.get('fainted', pd.Series()).sum()
+        kdr = total_kills / total_deaths if total_deaths != 0 else 0
+
+        # Crop count sum
+        crop_count = sum(crop_summary.values())
+
+        # Mean and Std of Accuracy
+        mean_accuracy = mean_acc
+        std_accuracy = std_acc
 
         data = {
             "Feature": ["Player Movement", "Deaths vs Kills", "Crops Harvested", "Combat Accuracy"],
             "Statistical Value": [
                 f"Average ({average_movement:.2f} pixels)",
-                f"KDR: {KDR:.2f}",
+                f"KDR: {kdr:.2f}",
                 f"Sum: {crop_count}",
                 f"Mean: {mean_accuracy:.2f}%, SD: {std_accuracy:.2f}%"
             ]
         }
+
 
         df = pd.DataFrame(data)
         fig, ax = plt.subplots(figsize=(6, 4))  # Smaller size (6x4 inches)

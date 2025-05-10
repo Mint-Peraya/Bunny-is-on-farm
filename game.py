@@ -143,7 +143,16 @@ class Game:
                             self.bunny.inventory.items[self.bunny.held_item] -= 1
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
                 elif tile.dug and tile.plant and tile.plant.harvestable:
-                    self.bunny.harvest_crop(self.farm)
+                    crop_type = tile.plant.crop_type
+                    result = tile.plant.harvest()
+                    if result:
+                        item, amount = result
+                        self.bunny.add_to_inventory(item, amount)
+                        tile.plant = None
+                        self.log_harvest(crop_type, amount)
+                    else:
+                        print("⚠️ Harvest failed — no result returned.")
+
                 elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
                     tile.water()
                     self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
@@ -335,7 +344,6 @@ class Game:
             return  # Skip rest of update loop this frame
 
 
-        
 
     def render_dungeon(self):
         """Render dungeon layout and enemies"""
@@ -372,6 +380,7 @@ class Game:
         self.farm.calendar.advance_day()
 
         self.save_game()
+        self.farm.regenerate_resources()
 
 
     def save_game(self):
@@ -394,13 +403,15 @@ class Game:
             "Time": "7:00",  # Reset daily
             "Health": self.bunny.health,
             "CropStatus": [
-                {
-                    "x": x,
-                    "y": y,
-                    "type": tile.plant.type if tile.plant else None,
-                    "stage": tile.plant.stage if tile.plant else None,
-                    "watered": tile.watered
-                }
+        {
+            "x": x,
+            "y": y,
+            "type": tile.plant.crop_type if tile.plant else None,
+            "stage": tile.plant.stage if tile.plant else None,
+            "harvestable": tile.plant.harvestable if tile.plant else False,
+            "watered": tile.watered
+        }
+
                 for y, row in enumerate(self.farm.tiles)
                 for x, tile in enumerate(row)
                 if tile.type == 'dirt' and (tile.dug or tile.plant)
@@ -426,13 +437,21 @@ class Game:
                 if self.username in all_saves:
                     save_data = all_saves[self.username]
                     
-                    # Load calendar data
                     self.farm.calendar.current_date = save_data.get("Day", 1)
-                    self.farm.calendar.current_day_name = save_data.get("Date", "Mon")
-                    self.farm.calendar.current_week = save_data.get("Week", 1)
-                    self.farm.calendar.current_season = save_data.get("Season", "Spring")
+
+                    # Restore current_day from name
+                    day_name = save_data.get("Date", "Mon")
+                    if day_name in self.farm.calendar.days_of_week:
+                        self.farm.calendar.current_day = self.farm.calendar.days_of_week.index(day_name)
+
+                    #  Restore current_season_index using saved name
+                    season_name = save_data.get("Season", "Spring")
+                    if season_name in self.farm.calendar.seasons:
+                        self.farm.calendar.current_season_index = self.farm.calendar.seasons.index(season_name)
+
+                    # ✅ This one is safe
                     self.farm.calendar.current_year = save_data.get("Year", 1)
-                    
+
                     # Load bunny stats
                     self.bunny.health = 100
     
@@ -453,7 +472,7 @@ class Game:
                                 
                                 if stages:
                                     tile.plant = Plant(crop_data["type"], stages)
-                                    tile.plant.stage = crop_data.get("stage", 0)
+                                    tile.plant.harvestable = crop_data.get("harvestable", False)
                                     tile.watered = crop_data.get("watered", False)
                             tile.dug = True
                     
@@ -521,10 +540,11 @@ class Game:
         self.update_camera(instant=True)
         self.save_game()
     
-    def log_harvest(self, crop_type, amount, file='Data/Crop.csv'):
+    def log_harvest(self, crop_type,amount, file='Data/Crop.csv'):
         with open(file, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([self.farm.calendar.current_week, crop_type, amount])
+    
     
     def log_attack(self, success, file='Data/accuracy_log.csv'):
         with open(file, 'a', newline='') as f:

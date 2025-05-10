@@ -1,5 +1,5 @@
 import pygame
-import math,random
+import math,random,csv
 from config import *
 from collections import defaultdict
 
@@ -317,6 +317,14 @@ class Bunny:
             self.attacking = True
             self.current_frame = 0
 
+            self.log_accuracy(success=False)
+    
+    def log_accuracy(self, success):
+        with open("Data/combat_accuracy.csv", "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([int(success)])  # 1 = hit, 0 = miss
+
+
     def update_projectiles(self, enemies, dungeon):
         # Update cooldown
         if self.carrot_weapon['cooldown'] > 0:
@@ -343,8 +351,25 @@ class Bunny:
             for enemy in enemies:
                 if proj_rect.colliderect(enemy.rect):
                     enemy.take_damage(self.carrot_weapon['damage'])
+
+                    # ✅ Log hit
+                    self.log_accuracy(success=True)
+
                     projectiles_to_remove.append(proj)
-                    break
+                    break  # Stop checking other enemies for this projectile
+
+                screen_w, screen_h = Config.get('window')
+                if (proj['x'] < 0 or proj['x'] * Config.get('bun_size') > screen_w or
+                    proj['y'] < 0 or proj['y'] * Config.get('bun_size') > screen_h):
+                    self.log_accuracy(success=False)
+                    projectiles_to_remove.append(proj)
+
+                    if self.name == "Player":
+                        self.log_accuracy(success=False)
+                    projectiles_to_remove.append(proj)
+                    for proj in projectiles_to_remove:
+                        if proj in self.carrot_weapon['projectiles']:
+                            self.carrot_weapon['projectiles'].remove(proj)
             
             # Check wall collisions or max range
             if (proj['distance'] >= self.carrot_weapon['range'] or 
@@ -465,6 +490,19 @@ class Inventory:
 
     def toggle_inventory_view(self):
         self.full_view = not self.full_view
+    
+    def use_item(self, item_name):
+        if self.items.get(item_name, 0) > 0:
+            self.items[item_name] -= 1
+            self.log_item_use(item_name)
+            return True
+        return False
+
+    def log_item_use(self, item_name):
+        with open("Data/inventory_usage.csv", "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([pygame.time.get_ticks(), item_name])
+
 
 
 class Stone:

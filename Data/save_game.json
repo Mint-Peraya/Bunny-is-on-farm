@@ -17,19 +17,68 @@
         "Relationship": {}
     },
     "Unknown": {
-        "Day": 3,
+        "Day": 12,
         "Date": "Sunday",
-        "Week": 1,
+        "Week": 2,
         "Season": "Spring",
         "Year": 1,
         "Time": "7:00",
         "Health": 100,
-        "CropStatus": [],
+        "CropStatus": [
+            {
+                "x": 14,
+                "y": 17,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 15,
+                "y": 17,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 16,
+                "y": 17,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 17,
+                "y": 17,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 18,
+                "y": 17,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 19,
+                "y": 17,
+                "type": "carrot",
+                "stage": 1,
+                "harvestable": true,
+                "watered": false
+            }
+        ],
         "Inventory": {
             "carrot_weapon": 1,
             "carrot_seed": 5
         },
-        "Money": 0,
+        "Money": 41,
         "Relationship": {}
     }
 }

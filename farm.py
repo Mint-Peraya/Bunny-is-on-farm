@@ -164,7 +164,23 @@ class Farm:
             house_img = pygame.transform.scale(house_img, (tile_size * 10, tile_size * 8))
             screen.blit(house_img, (8 * tile_size - camera_x, 8 * tile_size - camera_y))
 
-        
+        import random
+
+    def regenerate_resources(self):
+        for row in self.tiles:
+            for tile in row:
+                if tile.type == 'dirt':  # only regenerate on dirt
+                    chance = random.random()
+                    if chance < 0.01:
+                        tile.type = 'tree'
+                        tile.health = 10
+                        tile.max_health = 10
+                    elif chance < 0.02:
+                        tile.type = 'stone'
+                        tile.health = 10
+                        tile.max_health = 10
+
+
 
 class Plant:
     def __init__(self, crop_type, growth_images):
@@ -189,6 +205,9 @@ class Plant:
                 self.planted_time = now
                 if self.stage == self.max_stage:
                     self.harvestable = True
+            
+            if self.stage == self.max_stage:
+                self.harvestable = True
 
     def draw(self, screen, x, y, tile_size):
         if 0 <= self.stage < len(self.growth_images):
