@@ -65,7 +65,10 @@ class Config:
         'tree': pygame.image.load('assets/picture/tree.png').convert_alpha(),
         'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
         'house': pygame.image.load("assets/bgimages/home.png").convert_alpha()
-    }
+    },
+        'items': {
+    'carrot': pygame.image.load('assets/items/carrot.png').convert_alpha(),
+}
     }
 
     # config.py - Add to RESOURCE_ITEMS
@@ -77,6 +80,9 @@ class Config:
         "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
         "seed": ResourceItem("seed", "assets/items/seed.png"),
         "carrot_seed": ResourceItem("carrot seed", "assets/plants/carrot_seed.png"),
+        "carrot_weapon" : ResourceItem("carrot the destroyer", "assets/items/carrot_weapon.png"),
+        "boss_key": ResourceItem("Dungeon boss key", "assets/items/boss_key.png"),
+        "diamond": ResourceItem("Dungeon boss key", "assets/items/diamond.png"),
     }
 
     PLANT_CONFIG = {

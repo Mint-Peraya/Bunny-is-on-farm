@@ -69,7 +69,7 @@ class Maze:
             angle = 0
         else:
             angle = math.atan2(dy, dx)
-        compass_x, compass_y, compass_radius = Config.get('wx') - 100, 50, 40
+        compass_x, compass_y, compass_radius = Config.get('wx') - 50, 85, 40
         pygame.draw.circle(screen, Config.get('white'), (compass_x, compass_y), compass_radius, 2)
         arrow_end_x = compass_x + (compass_radius - 10) * math.cos(angle)
         arrow_end_y = compass_y + (compass_radius - 10) * math.sin(angle)

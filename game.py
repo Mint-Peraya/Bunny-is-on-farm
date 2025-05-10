@@ -148,6 +148,7 @@ class Game:
                     tile.water()
                     self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
 
+
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
         fade_surface.fill((0, 0, 0))
@@ -187,6 +188,9 @@ class Game:
         # Draw inventory
         self.bunny.inventory.draw(self.screen)
 
+        # Draw money
+        moneytxt = f"Money: {self.bunny.money}"
+        self.draw_text(moneytxt, 25, Config.get('white'), (10, 50))
         
 
         # Draw compass in maze mode
@@ -311,12 +315,27 @@ class Game:
         if keys[pygame.K_SPACE]:
             self.handle_interactions()
 
+        if keys[pygame.K_SPACE] and self.bunny.mode == 'dungeon':
+            self.bunny.throw_carrot()
+        
+        # Update projectiles
+        if self.bunny.mode == 'dungeon':
+            self.bunny.update_projectiles(self.dungeon.enemies, self.dungeon)
+
         # Update camera
         self.update_camera()
 
         # Update cooldowns
         if self.portal_cooldown > 0:
             self.portal_cooldown -= 1
+        
+        # Fainting check
+        if self.bunny.health <= 0:
+            self.handle_bunny_faint()
+            return  # Skip rest of update loop this frame
+
+
+        
 
     def render_dungeon(self):
         """Render dungeon layout and enemies"""
@@ -350,7 +369,7 @@ class Game:
         self.screen.blit(sleep_overlay, (0, 0))
         pygame.display.flip()
         pygame.time.wait(2000)  # sleep effect 2 sec
-        self.farm.calendar.current_date += 1
+        self.farm.calendar.advance_day()
 
         self.save_game()
 
@@ -415,8 +434,8 @@ class Game:
                     self.farm.calendar.current_year = save_data.get("Year", 1)
                     
                     # Load bunny stats
-                    self.bunny.health = save_data.get("Health", 100)
-                    
+                    self.bunny.health = 100
+    
                     # Load inventory
                     self.bunny.inventory.items = defaultdict(int, save_data.get("Inventory", {}))
                     
@@ -477,6 +496,43 @@ class Game:
             self.render()
             self.clock.tick(60)
         self.end_game()
+    
+    def handle_bunny_faint(self):
+        """Handle the bunny fainting and transition to next day at farmhouse."""
+        faint_overlay = pygame.Surface(Config.get('window'))
+        faint_overlay.fill((0, 0, 0))
+        font = pygame.font.Font(None, 60)
+        text = font.render("You passed out and were rescued...", True, (255, 255, 255))
+        rect = text.get_rect(center=(Config.get('window')[0]//2, Config.get('window')[1]//2))
+        faint_overlay.blit(text, rect)
+        self.screen.blit(faint_overlay, (0, 0))
+        pygame.display.flip()
+        pygame.time.wait(2500)  # Wait 2.5 seconds
+
+        # Set bunny position to farm house center
+        self.bunny.mode = 'farm'
+        self.bunny.x, self.bunny.y = 13, 14
+        self.bunny.target_x, self.bunny.target_y = 13, 14
+        self.bunny.health = 100
+
+        # Advance to next day
+        self.farm.calendar.advance_day()
+
+        self.update_camera(instant=True)
+        self.save_game()
+    
+    def log_harvest(self, crop_type, amount, file='Data/Crop.csv'):
+        with open(file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([self.farm.calendar.current_week, crop_type, amount])
+    
+    def log_attack(self, success, file='Data/accuracy_log.csv'):
+        with open(file, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([pygame.time.get_ticks(), int(success)])
+
+
+
 
 if __name__ == "__main__":
     Game().run()

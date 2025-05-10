@@ -1,6 +1,6 @@
 {
     "Mint": {
-        "Day": 2,
+        "Day": 1,
         "Date": "Sunday",
         "Week": 1,
         "Season": "Spring",
@@ -17,7 +17,7 @@
         "Relationship": {}
     },
     "Unknown": {
-        "Day": 1,
+        "Day": 3,
         "Date": "Sunday",
         "Week": 1,
         "Season": "Spring",
@@ -26,6 +26,7 @@
         "Health": 100,
         "CropStatus": [],
         "Inventory": {
+            "carrot_weapon": 1,
             "carrot_seed": 5
         },
         "Money": 0,

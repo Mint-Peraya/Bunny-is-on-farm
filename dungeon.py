@@ -1,5 +1,5 @@
 import pygame
-import math
+import math, csv
 import random
 from config import *
 from farm import Tile
@@ -131,20 +131,39 @@ class Dungeon:
         for enemy in self.enemies[:]:
             enemy.update(self.bunny, self)
             if enemy.health <= 0:
+                        # In the render method where loot boxes are created:
                 if isinstance(enemy, Boss):
-                    # Create loot box when boss dies
-                    self.loot_boxes.append(LootBox(enemy.x, enemy.y, "boss"))
+                    # Pass bunny reference when creating loot box
+                    self.loot_boxes.append(LootBox(enemy.x, enemy.y, "boss", self.bunny))
                 elif not enemy.has_dropped_loot:
-                    enemy.drop_loot()
+                    loot_type = "health_potion" if random.random() > 0.5 else "coins"
+                    self.loot_boxes.append(LootBox(enemy.x, enemy.y, loot_type, self.bunny))
                     enemy.has_dropped_loot = True
+                with open('Data/Enemy_difficulty.csv', 'a', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerow([enemy.enemy_type, "kill"])
+
                 self.enemies.remove(enemy)
             else:
                 enemy.render(screen, camera_x, camera_y)
+                if self.bunny.health<= 0:
+                    with open('Data/Enemy_difficulty.csv', 'a', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow([enemy.enemy_type,"fainted"])
         
         # Render loot boxes
         for loot_box in self.loot_boxes:
             loot_box.update(self.bunny)  # Check if loot box is opened by bunny
             loot_box.render(screen, camera_x, camera_y)
+    
+    def is_valid_position(self, x, y):
+        """Check if position is walkable (not a wall)"""
+        grid_x, grid_y = int(x), int(y)
+        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
+            return self.layout[grid_y][grid_x] == '.'
+        return False
+        
+
 
 
 class Enemy:
@@ -205,6 +224,7 @@ class Enemy:
             if self.rect.colliderect(bunny.rect):
                 self.attack_player(bunny)
 
+    # In the Enemy class, modify the patrol method:
     def patrol(self, dungeon):
         """Patrol behavior for normal and rare enemies"""
         if self.direction_timer <= 0:
@@ -213,7 +233,6 @@ class Enemy:
         else:
             self.direction_timer -= 1
 
-        
         # Calculate new position
         new_x, new_y = self.x, self.y
         if self.direction == "left":
@@ -225,7 +244,7 @@ class Enemy:
         elif self.direction == "down":
             new_y += self.speed
         
-        # Check if new position is valid
+        # Check if new position is valid (using more precise collision)
         if self.is_valid_position(new_x, new_y, dungeon):
             self.x, self.y = new_x, new_y
         else:
@@ -234,13 +253,25 @@ class Enemy:
         # Update rect position
         self.rect.x = self.x * Config.get('bun_size')
         self.rect.y = self.y * Config.get('bun_size')
-    
+
     def is_valid_position(self, x, y, dungeon):
-        """Check if position is valid (not a wall)"""
-        grid_x, grid_y = int(x), int(y)
-        if 0 <= grid_x < dungeon.width and 0 <= grid_y < dungeon.height:
-            return dungeon.layout[grid_y][grid_x] == '.'
-        return False
+        """Check if position is valid (not a wall) with fractional coordinates"""
+        # Check all four corners of the enemy's hitbox
+        size = self.size / Config.get('bun_size')  # Convert to tile units
+        corners = [
+            (x, y),
+            (x + size, y),
+            (x, y + size),
+            (x + size, y + size)
+        ]
+        
+        for corner_x, corner_y in corners:
+            grid_x, grid_y = int(corner_x), int(corner_y)
+            if not (0 <= grid_x < dungeon.width and 0 <= grid_y < dungeon.height):
+                return False
+            if dungeon.layout[grid_y][grid_x] != '.':
+                return False
+        return True
     
     def attack_player(self, player):
         """Attack the player"""
@@ -325,15 +356,28 @@ class Boss(Enemy):
         self.special_attack_timer = 180  # Add this line
         self.attack_cooldown = 0  # Add this line
     
-    def patrol(self):
-        """Handle the patrol logic for the Boss"""
+        # In the Boss class, modify the patrol method:
+    def patrol(self, dungeon):
+        """Boss-specific patrol that integrates with parent class"""
         if self.direction_timer <= 0:
             self.change_direction()
-            self.direction_timer = 5  # Reset timer after direction change
+            self.direction_timer = 30  # Longer timer for smoother movement
         else:
-            self.direction_timer -= 1  # Decrement timer
+            self.direction_timer -= 1
+
+        # Move with fractional coordinates for smooth movement
+        new_x, new_y = self.x, self.y
+        if self.patrol_direction == 'left':
+            new_x -= self.speed * 0.5  # Slower movement for boss
+        elif self.patrol_direction == 'right':
+            new_x += self.speed * 0.5
         
-        self.move_in_direction()
+        if self.is_valid_position(new_x, new_y, dungeon):
+            self.x, self.y = new_x, new_y
+        
+        # Update rect position
+        self.rect.x = self.x * Config.get('bun_size')
+        self.rect.y = self.y * Config.get('bun_size')
 
     def change_direction(self):
         """Change the patrol direction"""
@@ -388,7 +432,7 @@ class Boss(Enemy):
     
 
 class LootBox:
-    def __init__(self, x, y, loot_type):
+    def __init__(self, x, y, loot_type, bunny=None):  # Add bunny parameter
         self.x = x
         self.y = y
         self.loot_type = loot_type
@@ -398,20 +442,35 @@ class LootBox:
             Config.get('bun_size'), 
             Config.get('bun_size'))
         self.opened = False
+        self.bunny = bunny  # Store bunny reference
     
     def update(self, bunny):
         """Check if the bunny interacts with the loot box"""
         if not self.opened and self.rect.colliderect(bunny.rect):
+            self.bunny = bunny  # Ensure bunny reference is set
             self.open()
     
     def open(self):
         """Open the loot box and give items to the bunny"""
-        print(f"Bunny opened loot box with {self.loot_type}!")
-        self.opened = True
-        # Here you can add logic to give loot to the bunny's inventory (or apply effects)
-        if self.loot_type == "health_potion":
-            self.give_health_potion()
-    
+        if not self.opened and self.bunny:  # Check if bunny exists
+            print(f"Bunny opened loot box with {self.loot_type}!")
+            self.opened = True
+            
+            if self.loot_type == "health_potion":
+                self.bunny.heal(50)
+                self.bunny.inventory.show_notification("Health +50!", (0, 255, 0))
+            elif self.loot_type == "coins":
+                coins = random.randint(10, 50)
+                self.bunny.money += coins
+                self.bunny.inventory.show_notification(f"Found {coins} coins!", (255, 255, 0))
+            elif self.loot_type == "boss":
+                # Grant special boss loot
+                dd = random.randint(1,3)
+                self.bunny.inventory.items["boss_key"] = 1
+                self.bunny.inventory.items["diamond"] = dd
+                self.bunny.inventory.show_notification("You got the BOSS KEY!", (255, 215, 0))
+                self.bunny.money += 100
+
     def give_health_potion(self):
         """Example loot: health potion"""
         # Add health potion to the bunny's inventory (or apply effect directly)

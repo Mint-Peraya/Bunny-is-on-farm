@@ -12,6 +12,7 @@ class Bunny:
         self.speed = 0.1
         self.target_x, self.target_y = x, y
         self.held_item = None  # Name of the held item, e.g., 'seed'
+        self.money = 0
 
         self.current_direction = 'front'
         self.mode = mode
@@ -43,6 +44,15 @@ class Bunny:
         self.action_progress = 0  # 0-100%
         self.action_target = None  # Tile being worked on
         self.last_interacted = None
+
+        self.carrot_weapon = {
+            'damage': 20,
+            'cooldown': 0,
+            'max_cooldown': 30,  # frames
+            'range': 5,  # tiles
+            'speed': 0.3,  # tiles per frame
+            'projectiles': []  # Active carrot projectiles
+        }
 
 
     def start_action(self, action_type, target_tile):
@@ -223,6 +233,8 @@ class Bunny:
             font = pygame.font.Font(None, 24)
             text = f"Holding: {self.held_item}"
             screen.blit(font.render(text, True, (255, 255, 255)), (10, 120))
+        
+        self.draw_projectiles(screen, camera_x, camera_y)
 
 
     def switch_mode(self):
@@ -282,13 +294,85 @@ class Bunny:
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
+    def throw_carrot(self):
+        if self.carrot_weapon['cooldown'] <= 0 and 'carrot_weapon' in self.inventory.items and self.inventory.items['carrot_weapon'] > 0:
+            self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']
+            
+            # Create projectile based on facing direction
+            direction_map = {
+                'front': (0, 1),
+                'back': (0, -1),
+                'left': (-1, 0),
+                'right': (1, 0)
+            }
+            dx, dy = direction_map.get(self.current_direction, (0, 1))
+            
+            self.carrot_weapon['projectiles'].append({
+                'x': self.x,
+                'y': self.y,
+                'dx': dx * self.carrot_weapon['speed'],
+                'dy': dy * self.carrot_weapon['speed'],
+                'distance': 0
+            })
+            self.attacking = True
+            self.current_frame = 0
+
+    def update_projectiles(self, enemies, dungeon):
+        # Update cooldown
+        if self.carrot_weapon['cooldown'] > 0:
+            self.carrot_weapon['cooldown'] -= 1
+        
+        # Create a list of projectiles to remove
+        projectiles_to_remove = []
+        
+        # Update existing projectiles
+        for proj in self.carrot_weapon['projectiles']:
+            proj['x'] += proj['dx']
+            proj['y'] += proj['dy']
+            proj['distance'] += self.carrot_weapon['speed']
+            
+            # Check for hits
+            proj_rect = pygame.Rect(
+                proj['x'] * Config.get('bun_size'),
+                proj['y'] * Config.get('bun_size'),
+                Config.get('bun_size') // 2,
+                Config.get('bun_size') // 2
+            )
+            
+            # Check enemy collisions
+            for enemy in enemies:
+                if proj_rect.colliderect(enemy.rect):
+                    enemy.take_damage(self.carrot_weapon['damage'])
+                    projectiles_to_remove.append(proj)
+                    break
+            
+            # Check wall collisions or max range
+            if (proj['distance'] >= self.carrot_weapon['range'] or 
+                not dungeon.is_valid_position(proj['x'], proj['y'])):
+                projectiles_to_remove.append(proj)
+        
+        # Remove marked projectiles
+        for proj in projectiles_to_remove:
+            if proj in self.carrot_weapon['projectiles']:
+                self.carrot_weapon['projectiles'].remove(proj)
+
+    def draw_projectiles(self, screen, camera_x, camera_y):
+        carrot_img = Config.get('items')['carrot']
+        for proj in self.carrot_weapon['projectiles']:
+            screen.blit(
+                carrot_img,
+                (proj['x'] * Config.get('bun_size') - camera_x,
+                proj['y'] * Config.get('bun_size') - camera_y
+            ))
 
 class Inventory:
     def __init__(self, capacity=5):  # Increased capacity
         self.capacity = capacity
         self.items = defaultdict(int)
-        # Start with some seeds
+        # Start with some seeds and weapon
+        self.items['carrot_weapon'] = 1
         self.items["carrot_seed"] = 5
+        
         self.notification = None
         self.notification_time = 0
         self.full_view = False  # For toggling full inventory screen

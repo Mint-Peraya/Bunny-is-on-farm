@@ -1,1 +1,23 @@
-Enemy Type,Kills,Deaths
+Enemy Type,Kills/Deaths
+boss,kill
+normal,kill
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+rare,fainted
+rare,fainted
+boss,kill
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+normal,fainted
+rare,fainted
+rare,fainted
