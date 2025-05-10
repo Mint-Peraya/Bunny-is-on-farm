@@ -8,41 +8,32 @@ class Dungeon:
     def __init__(self, width, height, bunny):
         self.width = width
         self.height = height
-        self.layout = self.generate_dungeon_layout()  # Generate layout (rooms/corridors)
-        self.tiles = self.create_tiles()  # Initialize tiles
+        self.bunny = bunny
+        self.exit_x = width - 2
+        self.exit_y = height - 2
+        
+        # Load images from Config with fallback
+        env_images = Config.get('environ')
+        self.wall_img = env_images.get('wall')
+        self.floor_img = env_images.get('floor')
+        
+        # Create fallback surfaces if images failed to load
+        if self.wall_img is None:
+            self.wall_img = pygame.Surface((Config.get('bun_size'), Config.get('bun_size')))
+            self.wall_img.fill((70, 70, 90))  # Dark gray color for walls
+            
+        if self.floor_img is None:
+            self.floor_img = pygame.Surface((Config.get('bun_size'), Config.get('bun_size')))
+            self.floor_img.fill((50, 50, 70))  # Darker gray for floors
+            
+        self.layout = self.generate_dungeon_layout()
+        self.tiles = self.create_tiles()
         self.enemies = []
         self.create_rooms_and_enemies()
-        self.loot_boxes = []  # For storing loot boxes from dead enemies
-        self.exit_x = self.width - 2  # Example exit coordinates
-        self.exit_y = self.height - 2
-        self.bunny = bunny
-
-    def create_tiles(self):
-        """Create a grid of tiles with types for the dungeon."""
-        tiles = []
-        for y in range(self.height):
-            row = []
-            for x in range(self.width):
-                if random.random() > 0.8:
-                    row.append(Tile(x, y, 'tree'))  # Example: random trees
-                else:
-                    row.append(Tile(x, y, 'empty'))  # Example: empty space
-            tiles.append(row)
-        return tiles
-
-    def update(self, bunny):
-        """Update the state of the dungeon. For example, update enemies or check conditions."""
-        # Update enemies (patrolling, checking if they see the player, etc.)
-        for enemy in self.enemies:
-            enemy.update(bunny, self)  # Now you can use bunny properly
-
-        # Update any loot boxes or special effects
-        for loot_box in self.loot_boxes:
-            loot_box.update(bunny)
-
-
+        self.loot_boxes = []
+        
     def generate_dungeon_layout(self):
-        """Generate a fixed dungeon layout with rooms and corridors"""
+        """Generate a dungeon layout with clear paths and walls."""
         layout = [['#' for _ in range(self.width)] for _ in range(self.height)]
         
         # Create main rooms
@@ -64,35 +55,68 @@ class Dungeon:
         self.create_corridor(layout, (5, 10), (3, 10))  # Horizontal to left
         self.create_corridor(layout, (15, 10), (21, 10)) # Horizontal to right
         
-        # Create some decorative walls/pillars
+        # Add some decorative walls/pillars
         for x, y in [(8, 8), (12, 8), (8, 12), (12, 12)]:
-            layout[y][x] = '#'
+            if 0 <= y < self.height and 0 <= x < self.width:
+                layout[y][x] = '#'
+        
+        # Ensure exit is accessible
+        if 0 <= self.exit_y < self.height and 0 <= self.exit_x < self.width:
+            layout[self.exit_y][self.exit_x] = '.'
+            if self.exit_y > 0:
+                layout[self.exit_y-1][self.exit_x] = '.'
         
         return layout
 
+    def create_tiles(self):
+        """Create a grid of tiles with types based on dungeon layout."""
+        tiles = []
+        for y in range(self.height):
+            row = []
+            for x in range(self.width):
+                # Use layout to determine tile type
+                if self.layout[y][x] == '#':
+                    row.append(Tile(x, y, 'stone'))  # Wall
+                else:
+                    row.append(Tile(x, y, 'empty'))  # Walkable floor
+            tiles.append(row)
+        return tiles
+
+    def update(self, bunny):
+        """Update the state of the dungeon."""
+        # Update enemies
+        for enemy in self.enemies:
+            enemy.update(bunny, self)
+
+        # Update loot boxes
+        for loot_box in self.loot_boxes:
+            loot_box.update(bunny)
+
     def create_room(self, layout, room):
-        """Mark room area in the dungeon layout"""
+        """Mark room area in the dungeon layout as walkable."""
         x, y, w, h = room
         for i in range(y, y + h):
             for j in range(x, x + w):
                 if 0 <= i < self.height and 0 <= j < self.width:
-                    layout[i][j] = '.'
+                    layout[i][j] = '.'  # Floor tile
 
     def create_corridor(self, layout, start, end):
-        """Create a simple corridor between two points"""
+        """Create a corridor between two points."""
         x1, y1 = start
         x2, y2 = end
-        if x1 == x2:  # Vertical corridor
-            for i in range(min(y1, y2), max(y1, y2) + 1):
-                if 0 <= i < self.height:
-                    layout[i][x1] = '.'
-        elif y1 == y2:  # Horizontal corridor
-            for i in range(min(x1, x2), max(x1, x2) + 1):
-                if 0 <= i < self.width:
-                    layout[y1][i] = '.'
+        
+        # Horizontal corridor first
+        for x in range(min(x1, x2), max(x1, x2) + 1):
+            if 0 <= x < self.width:
+                layout[y1][x] = '.'
+        
+        # Then vertical corridor
+        for y in range(min(y1, y2), max(y1, y2) + 1):
+            if 0 <= y < self.height:
+                layout[y][x2] = '.'
 
     def create_rooms_and_enemies(self):
-        """Place enemies in predefined positions"""
+        """Place enemies in predefined positions."""
         # Boss in the center room
         self.enemies.append(Boss(15, 10))
 
@@ -111,29 +135,26 @@ class Dungeon:
         self.enemies.append(Enemy(24, 16, "rare"))   # Bottom-right room
 
     def render(self, screen, camera_x, camera_y):
-        """Render the dungeon layout"""
-        for i in range(self.height):
-            for j in range(self.width):
-                if self.layout[i][j] == '#':
-                    pygame.draw.rect(screen, (50, 50, 70), 
-                                (j * Config.get('bun_size') - camera_x, 
-                                    i * Config.get('bun_size') - camera_y, 
-                                    Config.get('bun_size'), 
-                                    Config.get('bun_size')))
-                elif self.layout[i][j] == '.':
-                    pygame.draw.rect(screen, (80, 80, 100), 
-                                (j * Config.get('bun_size') - camera_x, 
-                                    i * Config.get('bun_size') - camera_y, 
-                                    Config.get('bun_size'), 
-                                    Config.get('bun_size')))
+        """Render the dungeon layout with proper wall/floor visuals"""
+        for y in range(self.height):
+            for x in range(self.width):
+                pos_x = x * Config.get('bun_size') - camera_x
+                pos_y = y * Config.get('bun_size') - camera_y
+                
+                if self.layout[y][x] == '#':  # Wall
+                    screen.blit(pygame.transform.scale(self.wall_img, 
+                              (Config.get('bun_size'), Config.get('bun_size'))), 
+                              (pos_x, pos_y))
+                else:  # Floor
+                    screen.blit(pygame.transform.scale(self.floor_img, 
+                              (Config.get('bun_size'), Config.get('bun_size'))), 
+                              (pos_x, pos_y))
         
         # Render enemies
         for enemy in self.enemies[:]:
             enemy.update(self.bunny, self)
             if enemy.health <= 0:
-                        # In the render method where loot boxes are created:
                 if isinstance(enemy, Boss):
-                    # Pass bunny reference when creating loot box
                     self.loot_boxes.append(LootBox(enemy.x, enemy.y, "boss", self.bunny))
                 elif not enemy.has_dropped_loot:
                     loot_type = "health_potion" if random.random() > 0.5 else "coins"
@@ -142,28 +163,25 @@ class Dungeon:
                 with open('Data/Enemy_difficulty.csv', 'a', newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow([enemy.enemy_type, "kill"])
-
                 self.enemies.remove(enemy)
             else:
                 enemy.render(screen, camera_x, camera_y)
-                if self.bunny.health<= 0:
+                if self.bunny.health <= 0:
                     with open('Data/Enemy_difficulty.csv', 'a', newline='') as f:
                         writer = csv.writer(f)
                         writer.writerow([enemy.enemy_type,"fainted"])
         
         # Render loot boxes
         for loot_box in self.loot_boxes:
-            loot_box.update(self.bunny)  # Check if loot box is opened by bunny
+            loot_box.update(self.bunny)
             loot_box.render(screen, camera_x, camera_y)
     
     def is_valid_position(self, x, y):
-        """Check if position is walkable (not a wall)"""
+        """Check if position is walkable (not a wall)."""
         grid_x, grid_y = int(x), int(y)
         if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
-            return self.layout[grid_y][grid_x] == '.'
+            return self.layout[grid_y][grid_x] == '.'  # Only '.' is walkable
         return False
-        
-
 
 
 class Enemy:

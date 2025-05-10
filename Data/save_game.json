@@ -1,3 +1,51 @@
 {
-    
+    "Unknown": {
+        "Day": 6,
+        "Date": "Friday",
+        "Week": 1,
+        "Season": "Spring",
+        "Year": 1,
+        "Time": "7:00",
+        "Health": 100,
+        "CropStatus": [
+            {
+                "x": 2,
+                "y": 1,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 1,
+                "y": 2,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 13,
+                "y": 14,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            },
+            {
+                "x": 15,
+                "y": 14,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            }
+        ],
+        "Inventory": {
+            "wood": 3,
+            "stone": 3
+        },
+        "Money": 0,
+        "Relationship": {}
+    }
 }

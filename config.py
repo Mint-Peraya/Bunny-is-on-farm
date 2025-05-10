@@ -66,6 +66,9 @@ class Config:
         'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
         'house': pygame.image.load("assets/bgimages/home.png").convert_alpha(),
         'mailbox': pygame.image.load('assets/picture/mailbox.png').convert_alpha(),
+        "noti":pygame.image.load('assets/picture/noti.png').convert_alpha(),
+        "wall": pygame.image.load('assets/picture/wall.png').convert_alpha(),
+        "floor":pygame.image.load('assets/picture/floor.png').convert_alpha(),
     },
         'items': {
     'carrot': pygame.image.load('assets/items/carrot.png').convert_alpha(),

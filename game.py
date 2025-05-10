@@ -16,6 +16,7 @@ class Game:
         self.has_warped = False
         self.running = True
         pygame.init()
+        pygame.display.set_caption('Bunny is on farm')
         self.screen = pygame.display.set_mode(Config.get('window'))
         self.clock = pygame.time.Clock()
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
@@ -27,13 +28,41 @@ class Game:
         # Store username
         self.username = username
         
-        # Load saved game or initialize new game
-        self.reset_game(load_save=True)  # Modified to load save by default
-        
         self.bunny = Bunny(10, 10, mode='farm', username=username)  # Pass username to Bunny
         self.dungeon = Dungeon(30, 30, self.bunny)
         
         self.last_log_time = pygame.time.get_ticks()
+        if not self.is_player_exists():
+            self.handle_new_player()
+
+        self.reset_game(load_save=True)  # Modified to load save by default
+
+    def is_player_exists(self):
+        """Check if the player's save exists"""
+        try:
+            with open('Data/save_game.json', 'r') as f:
+                all_saves = json.load(f)
+            return self.username in all_saves
+        except FileNotFoundError:
+            return False   
+
+    def handle_new_player(self):
+        """Handle new player setup - shown once before starting the game"""
+        print(f"Welcome {self.username}! First time playing!")
+
+        # You can display a message, intro scene, or a tutorial here
+        txt1 = "Welcome, little one. I know I am not part of the family you once had, but the forest has brought you to me, and now you will rest here, where the shadows of the trees cannot reach you. "
+        txt2 = "This tiny space has been a refuge for many, and it will be yours for a time. But I must leave."
+        txt3 = " I have places to go. Dear bunny, you will be left in peace. I hope this new life brings you peace, though I won't be here to see your journey. "
+        txt4 = "The world called me elsewhere. But until then, enjoy the quiet of this space, for it will be your home, at least for now." 
+        txt5 = "Goodbye, little one. Good luck!"
+
+        BigScene(self.screen,self.clock,txt1,Config.get('font'),40).run()
+        BigScene(self.screen,self.clock,txt2,Config.get('font'),40).run()
+        BigScene(self.screen,self.clock,txt3,Config.get('font'),40).run()
+        BigScene(self.screen,self.clock,txt4,Config.get('font'),40).run()
+        BigScene(self.screen,self.clock,txt5,Config.get('font'),40).run()
+        self.save_game()    
 
     def warp_to_dungeon(self):
         """Transition to dungeon mode"""
@@ -88,7 +117,6 @@ class Game:
             time_taken = (end_time - self.start_time) / 1000
             self.log_to_csv(time_taken, self.success)
         
-
     def init_portals(self):
         self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
         self.farm.interactables.append(self.farm_portal)
@@ -111,7 +139,6 @@ class Game:
             loaded = self.load_game()
             if not loaded:
                 self.save_game()  # Auto-save for new users
-
 
     def handle_interactions(self):
         front_x, front_y = self.bunny.get_front_position()
@@ -373,6 +400,11 @@ class Game:
         if self.bunny.health <= 0:
             self.handle_bunny_faint()
             return  # Skip rest of update loop this frame
+        
+        if (self.farm.calendar.current_date and self.farm.calendar.current_year) == 1 and self.farm.calendar.current_season == 'Spring':
+            txt = 'Hi babe'
+            BigScene(self.screen,self.clock,txt,Config.get('font'),40)
+            pass
 
     def render_dungeon(self):
         """Render dungeon layout and enemies"""

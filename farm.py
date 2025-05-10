@@ -57,14 +57,36 @@ class Tile:
         if self.type == 'house':
             pygame.draw.rect(screen, (150, 75, 0), (x, y, size, size))
         else:
-            base_image = env_images.get(self.type, env_images['dirt'])
+            # Get the base image (dirt by default)
+            base_image = env_images.get('dirt')
+            # Draw the base tile (dirt)
             screen.blit(pygame.transform.scale(base_image, (size, size)), (x, y))
+            
+            # Draw tree/stone if present (with proper transparency)
+            if self.type in ('tree', 'stone'):
+                overlay_img = env_images.get(self.type)
+                if overlay_img:
+                    # Create a temporary surface for proper alpha blending
+                    temp_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+                    scaled_img = pygame.transform.scale(
+                        overlay_img, 
+                        (int(size * self.tree_scale if self.type == 'tree' else size * self.stone_scale), 
+                         int(size * self.tree_scale if self.type == 'tree' else size * self.stone_scale))
+                    )
+                    # Position the scaled image with offset
+                    img_x = (size - scaled_img.get_width()) // 2 + self.image_offset_x
+                    img_y = size - scaled_img.get_height()  # Align to bottom
+                    temp_surface.blit(scaled_img, (img_x, img_y))
+                    screen.blit(temp_surface, (x, y))
 
         # Draw soil overlay if dug
         if self.dug and self.type == 'dirt':
             soil_overlay = env_images.get('soil_overlay')
             if soil_overlay:
-                screen.blit(pygame.transform.scale(soil_overlay, (size, size)), (x, y))
+                soil_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+                scaled_soil = pygame.transform.scale(soil_overlay, (size, size))
+                soil_surface.blit(scaled_soil, (0, 0))
+                screen.blit(soil_surface, (x, y))
 
         # Draw plant if exists
         if self.plant:
@@ -280,6 +302,27 @@ class Mailbox:
         self.mail_items = []
         self.notification_timer = 0
         self.image = Config.get('environ').get('mailbox', pygame.Surface((32,32)))
+        self.noti_img = pygame.image.load('assets/picture/noti.png').convert_alpha()
+
+    def draw(self, screen, camera_x, camera_y):
+        """Draw mailbox with notification if has mail"""
+        x = self.tile_x * self.size - camera_x
+        y = self.tile_y * self.size - camera_y
+        
+        # Draw mailbox
+        screen.blit(pygame.transform.scale(self.image, (self.size, self.size)), (x, y))
+        
+        # Draw notification if has mail
+        if self.has_mail or self.notification_timer:
+            # Scale notification image to appropriate size
+            noti_size = self.size // 2
+            scaled_noti = pygame.transform.scale(self.noti_img, (noti_size, noti_size))
+            screen.blit(scaled_noti, (x + self.size - noti_size, y - noti_size//2))
+            
+            if self.notification_timer:
+                font = pygame.font.Font(None, 24)
+                text = font.render("New rewards!", True, (255, 255, 255))
+                screen.blit(text, (x, y - 30))
 
     @property
     def x(self):
@@ -309,21 +352,3 @@ class Mailbox:
         """Update notification timer"""
         if self.notification_timer and pygame.time.get_ticks() - self.notification_timer > 5000:
             self.notification_timer = 0
-
-    def draw(self, screen, camera_x, camera_y):
-        """Draw mailbox with notification if has mail"""
-        x = self.tile_x * self.size - camera_x
-        y = self.tile_y * self.size - camera_y
-        
-        # Draw mailbox
-        screen.blit(pygame.transform.scale(self.image, (self.size, self.size)), (x, y))
-        
-        # Draw notification if has mail
-        if self.has_mail or self.notification_timer:
-            pygame.draw.circle(screen, (255, 0, 0), 
-                             (x + self.size - 10, y + 10), 8)
-            
-            if self.notification_timer:
-                font = pygame.font.Font(None, 24)
-                text = font.render("New rewards!", True, (255, 255, 255))
-                screen.blit(text, (x, y - 30))
