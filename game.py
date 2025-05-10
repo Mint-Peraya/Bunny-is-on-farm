@@ -1,6 +1,5 @@
 import pygame
-import csv
-import json
+import csv,json,os,sys,subprocess
 from config import *
 from maze import Maze
 from bunny import *
@@ -8,9 +7,6 @@ from farm import *
 from dungeon import Dungeon 
 from stattk import *
 import tkinter as tk
-import subprocess
-import sys
-import os
 
 
 class Game:
@@ -23,7 +19,10 @@ class Game:
         self.screen = pygame.display.set_mode(Config.get('window'))
         self.clock = pygame.time.Clock()
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
+        self.farm = Farm(50, 30)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
+        self.mailbox = Mailbox(15, 14)  # Position near house
+        self.farm.interactables.append(self.mailbox)
         
         # Store username
         self.username = username
@@ -116,6 +115,12 @@ class Game:
 
     def handle_interactions(self):
         front_x, front_y = self.bunny.get_front_position()
+
+        # Check if interacting with mailbox
+        if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
+            if self.mailbox.check_mail(self.bunny):
+                self.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
+        
         world = self.maze if self.bunny.mode == 'maze' else self.farm
         
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
@@ -156,7 +161,6 @@ class Game:
                 elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
                     tile.water()
                     self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
-
 
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
@@ -239,13 +243,29 @@ class Game:
                     elif self.bunny.mode =='maze':
                         self.bunny.can_interact_with(self.maze.interactables, self)
 
-                elif pygame.K_1 <= event.key <= pygame.K_5:
-                    index = event.key - pygame.K_1
-                    item_list = list(self.bunny.inventory.items.keys())
-                    if index < len(item_list):
-                        self.bunny.held_item = item_list[index]
-                        self.bunny.inventory.show_notification(f"Holding: {self.bunny.held_item}", (255, 255, 100))
+                elif self.bunny.inventory.full_view:
+                        if pygame.K_1 <= event.key <= pygame.K_6:
+                            num = event.key - pygame.K_1  # hotbar slot index
+                            selected = self.bunny.inventory.swap_selected_index
+                            if selected is not None:
+                                if num < len(self.bunny.inventory.hotbar_indices):
+                                    self.bunny.inventory.hotbar_indices[num] = selected
 
+                            if self.bunny.inventory.show_swap_box:
+                                if event.key == pygame.K_BACKSPACE:
+                                    self.bunny.inventory.swap_input_text = self.bunny.inventory.swap_input_text[:-1]
+                                elif event.key == pygame.K_RETURN:
+                                    try:
+                                        slot_index = int(self.bunny.inventory.swap_input_text) - 1
+                                        if 0 <= slot_index < 6 and self.bunny.inventory.swap_selected_index is not None:
+                                            self.bunny.inventory.hotbar_indices[slot_index] = self.bunny.inventory.swap_selected_index
+                                    except:
+                                        pass
+                                    self.bunny.inventory.swap_input_text = ""
+                                    self.bunny.inventory.show_swap_box = False
+                                    self.bunny.inventory.swap_selected_index = None
+                                elif event.unicode.isdigit():
+                                    self.bunny.inventory.swap_input_text += event.unicode
 
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""
@@ -257,13 +277,24 @@ class Game:
         """Render farm mode"""
         self.farm.draw(self.screen, self.camera_x, self.camera_y)
         self.farm_portal.draw(self.screen, self.camera_x, self.camera_y)
+        self.mailbox.draw(self.screen, self.camera_x, self.camera_y)
 
     def log_to_csv(self, time_taken, success):
-        """Log game results (time, success/failure) into CSV file"""
-        print(f"Logging to CSV: Time taken = {time_taken}, Success = {success}")  # Debugging line
+        """Log game results and add rewards if successful"""
+        print(f"Logging to CSV: Time taken = {time_taken}, Success = {success}")
         with open('Data/maze_log.csv', mode='a', newline='') as file:
             writer = csv.writer(file)
             writer.writerow([time_taken, success])
+                
+        if success:
+            # Add rewards to mailbox
+            rewards = []
+            rewards.append(('diamond', 5))
+            rewards.append(('carrot', 3))
+            rewards.append(('stone', 5))
+                
+            self.mailbox.add_mail(rewards)
+            self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
 
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
@@ -343,8 +374,6 @@ class Game:
             self.handle_bunny_faint()
             return  # Skip rest of update loop this frame
 
-
-
     def render_dungeon(self):
         """Render dungeon layout and enemies"""
         self.dungeon.render(self.screen, self.camera_x, self.camera_y)
@@ -381,7 +410,6 @@ class Game:
 
         self.save_game()
         self.farm.regenerate_resources()
-
 
     def save_game(self):
         """Save current user's game state into a shared JSON file for all users."""
@@ -544,14 +572,11 @@ class Game:
         with open(file, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([self.farm.calendar.current_week, crop_type, amount])
-    
-    
+      
     def log_attack(self, success, file='Data/accuracy_log.csv'):
         with open(file, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([pygame.time.get_ticks(), int(success)])
-
-
 
 
 if __name__ == "__main__":

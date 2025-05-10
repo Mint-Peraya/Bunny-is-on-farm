@@ -64,13 +64,17 @@ class Config:
         'soil_overlay': pygame.image.load('assets/picture/soil_overlay.png').convert_alpha(),
         'tree': pygame.image.load('assets/picture/tree.png').convert_alpha(),
         'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
-        'house': pygame.image.load("assets/bgimages/home.png").convert_alpha()
+        'house': pygame.image.load("assets/bgimages/home.png").convert_alpha(),
+        'mailbox': pygame.image.load('assets/picture/mailbox.png').convert_alpha(),
     },
         'items': {
     'carrot': pygame.image.load('assets/items/carrot.png').convert_alpha(),
+    "potato": pygame.image.load('assets/items/potato.png').convert_alpha(),
+    "radish": pygame.image.load('assets/items/radish.png').convert_alpha(),
+    "spinach": pygame.image.load('assets/items/spinach.png').convert_alpha(),
+    "turnip": pygame.image.load('assets/items/turnip.png').convert_alpha(),
 }
     }
-
     # config.py - Add to RESOURCE_ITEMS
     RESOURCE_ITEMS = {
         "wood": ResourceItem("wood", "assets/items/wood.png"),
@@ -78,8 +82,12 @@ class Config:
         "carrot": ResourceItem("carrot", "assets/items/carrot.png"),
         "axe": ResourceItem("axe", "assets/items/axe.png"),
         "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
-        "seed": ResourceItem("seed", "assets/items/seed.png"),
+        # "seed": ResourceItem("seed", "assets/items/seed.png"),
         "carrot_seed": ResourceItem("carrot seed", "assets/plants/carrot_seed.png"),
+        "potato_seed": ResourceItem("potato seed", "assets/plants/potato_seed.png"),
+        "radish_seed": ResourceItem("radish seed", "assets/plants/radish_seed.png"),
+        "spinach_seed": ResourceItem("spinach seed", "assets/plants/spinach_seed.png"),
+        "turnip_seed": ResourceItem("turnip seed", "assets/plants/turnip_seed.png"),
         "carrot_weapon" : ResourceItem("carrot the destroyer", "assets/items/carrot_weapon.png"),
         "boss_key": ResourceItem("Dungeon boss key", "assets/items/boss_key.png"),
         "diamond": ResourceItem("Dungeon boss key", "assets/items/diamond.png"),
@@ -88,10 +96,39 @@ class Config:
     PLANT_CONFIG = {
     "carrot": {
         "stages": 3,
-        "grow_time": 3000,
+        "grow_time":7 * 60 * 1000,
         "seasons": ["Spring","Summer", "Fall"],
         "harvest_item": "carrot",
         "harvest_amount": 2
+    },
+    "potato": {
+        "stages": 3,
+        "grow_time": 3000,
+        "seasons": ["Spring","Summer","Winter"],
+        "harvest_item": "potato",
+        "harvest_amount": 1
+    },
+    "radish": {
+        "stages": 3,
+        "grow_time": 3000,
+        "seasons": ["Spring","Fall"],
+        "harvest_item": "radish",
+        "harvest_amount": 2
+    }
+    ,
+    "spinach": {
+        "stages": 3,
+        "grow_time": 3000,
+        "seasons": ["Spring", "Fall"],
+        "harvest_item": "spinach",
+        "harvest_amount": 2
+    },
+    "turnip": {
+        "stages": 3,
+        "grow_time": 3000,
+        "seasons": ["Spring","Fall","Winter"],
+        "harvest_item": "turnip",
+        "harvest_amount": 1
     }}
 
     # Store images separately to prevent premature loading

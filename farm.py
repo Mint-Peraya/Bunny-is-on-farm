@@ -181,7 +181,6 @@ class Farm:
                         tile.max_health = 10
 
 
-
 class Plant:
     def __init__(self, crop_type, growth_images):
         self.crop_type = crop_type
@@ -270,3 +269,61 @@ class Calendar:
     def get_date_string(self):
         # Return formatted string with the current day, date, season, week, and year
         return f"{self.current_day_name} {self.current_date}, {self.current_season}, Week {self.current_week}, Year {self.current_year}"
+
+
+class Mailbox:
+    def __init__(self, x, y):
+        self.tile_x = x
+        self.tile_y = y
+        self.size = Config.get('bun_size')
+        self.has_mail = False
+        self.mail_items = []
+        self.notification_timer = 0
+        self.image = Config.get('environ').get('mailbox', pygame.Surface((32,32)))
+
+    @property
+    def x(self):
+        return self.tile_x
+
+    @property
+    def y(self):
+        return self.tile_y
+
+    def add_mail(self, items):
+        """Add reward items to mailbox"""
+        self.mail_items.extend(items)
+        self.has_mail = True
+        self.notification_timer = pygame.time.get_ticks()
+
+    def check_mail(self, bunny):
+        """Player collects mail items"""
+        if self.has_mail:
+            for item, amount in self.mail_items:
+                bunny.add_to_inventory(item, amount)
+            self.mail_items = []
+            self.has_mail = False
+            return True
+        return False
+
+    def update(self):
+        """Update notification timer"""
+        if self.notification_timer and pygame.time.get_ticks() - self.notification_timer > 5000:
+            self.notification_timer = 0
+
+    def draw(self, screen, camera_x, camera_y):
+        """Draw mailbox with notification if has mail"""
+        x = self.tile_x * self.size - camera_x
+        y = self.tile_y * self.size - camera_y
+        
+        # Draw mailbox
+        screen.blit(pygame.transform.scale(self.image, (self.size, self.size)), (x, y))
+        
+        # Draw notification if has mail
+        if self.has_mail or self.notification_timer:
+            pygame.draw.circle(screen, (255, 0, 0), 
+                             (x + self.size - 10, y + 10), 8)
+            
+            if self.notification_timer:
+                font = pygame.font.Font(None, 24)
+                text = font.render("New rewards!", True, (255, 255, 255))
+                screen.blit(text, (x, y - 30))

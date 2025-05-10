@@ -247,9 +247,9 @@ class Bunny:
             dist = math.hypot(self.x - item.rect.centerx / Config.get('bun_size'),
                               self.y - item.rect.centery / Config.get('bun_size'))
             if dist < self.interact_range:
-                self.inventory.add_item(item)
-                items_group.remove(item)
-                break
+                if self.inventory.add_item(item.name):  # Add item to inventory if there's space
+                    items_group.remove(item)  # Remove item from the world
+                    break
 
     def get_front_position(self):
         """Get the position in front of bunny based on current direction"""
@@ -390,65 +390,70 @@ class Bunny:
                 proj['y'] * Config.get('bun_size') - camera_y
             ))
 
-class Inventory:
-    def __init__(self, capacity=5):  # Increased capacity
-        self.capacity = capacity
-        self.items = defaultdict(int)
-        # Start with some seeds and weapon
-        self.items['carrot_weapon'] = 1
-        self.items["carrot_seed"] = 5
-        
-        self.notification = None
-        self.notification_time = 0
-        self.full_view = False  # For toggling full inventory screen
 
+class Inventory:
+    def __init__(self, capacity=20):  # Increased capacity
+        self.capacity = capacity
+        self.items = defaultdict(int)  # Store items and their counts
+        self.hotbar_indices = list(range(6))  # Default to first 6 items
+        self.swap_selected_index = None  # No selection initially
+        self.swap_input_text = ""
+        self.show_swap_box = False
+        self.full_view = False
+        self.dragged_item = None 
 
     def is_full(self):
-        # Return True if the number of unique items exceeds the capacity
         return len(self.items) >= self.capacity
 
     def add_item(self, item):
-        if len(self.items) < self.capacity:  # Check if there's space for new items
-            self.items[item.name] += 1
-            if self.items[item.name] <= 0:  # If count reaches zero, delete the item
-                del self.items[item.name]
-            self.show_notification(f"Picked up {item.name}", (0, 255, 0))
+        """Add item to inventory"""
+        if len(self.items) < self.capacity:  # Check if space is available
+            self.items[item.name] += 1  # Ensure 'item.name' is a string
             return True
-        self.show_notification("Inventory Full!", (255, 0, 0))
         return False
 
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
+
     def draw(self, screen):
+        """Draw inventory UI based on current view"""
         if self.full_view:
             self.draw_full_inventory(screen)
         else:
             self.draw_quick_bar(screen)
 
     def draw_quick_bar(self, screen):
+        """Draw only the 6 slots of the hotbar"""
         slot_size = 64
         padding = 5
-        start_x = (screen.get_width() - (slot_size + padding) * self.capacity) // 2
+        start_x = (screen.get_width() - (slot_size + padding) * 6) // 2
         y = screen.get_height() - slot_size - 10
 
-        item_list = list(self.items.items())
-        for i in range(self.capacity):
+        for i in range(6):
             rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
             pygame.draw.rect(screen, (200, 200, 200), rect, 2)
 
-            if i < len(item_list):
-                name, count = item_list[i]
-                if count > 0:  # Only draw the item if count is greater than 0
-                    item = Config.RESOURCE_ITEMS[name]
+            item_index = self.hotbar_indices[i]
+            if item_index is not None and item_index < len(self.items):
+                item_name, count = list(self.items.items())[item_index]
+                if count > 0:
+                    item = Config.RESOURCE_ITEMS[item_name]
                     img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
                     screen.blit(img, (rect.x + 5, rect.y + 5))
                     font = pygame.font.SysFont(None, 22)
                     count_surface = font.render(str(count), True, (255, 255, 255))
                     screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
 
-        if self.notification and pygame.time.get_ticks() - self.notification_time < 2000:
-            notif_img, _ = self.notification
-            screen.blit(notif_img, (20, 20))
 
-
+    def select_item_for_swap(self, index):
+        """Select an item to swap into the hotbar."""
+        item_list = list(self.items.items())
+        if 0 <= index < len(item_list):
+            self.swap_selected_index = index
+            self.show_swap_box = True  # Show the input box for slot selection
+    
     def draw_full_inventory(self, screen):
         width = 600
         height = 300
@@ -456,7 +461,7 @@ class Inventory:
         pygame.draw.rect(screen, (50, 50, 50), box)
         pygame.draw.rect(screen, (200, 200, 200), box, 4)
 
-        font = pygame.font.SysFont(None, 28)
+        font = pygame.font.Font(Config.get('font'), 24)
         title = font.render("Inventory", True, (255, 255, 255))
         screen.blit(title, (box.x + 20, box.y + 10))
 
@@ -467,29 +472,79 @@ class Inventory:
         start_y = box.y + 50
 
         item_list = list(self.items.items())
+        
+        # First pass: draw all items except the dragged one
         for i, (name, count) in enumerate(item_list):
-            if count > 0:  # Only draw the item if count is greater than 0
+            if count > 0 and i != self.dragged_item:
+                self.draw_inventory_item(screen, name, count, i, start_x, start_y, slot_size, padding, cols, font)
+
+        # Handle dragging logic
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_pressed = pygame.mouse.get_pressed()
+        
+        # Check for new drag
+        if mouse_pressed[0] and self.dragged_item is None:
+            for i, (name, count) in enumerate(item_list):
+                if count > 0:
+                    row = i // cols
+                    col = i % cols
+                    x = start_x + col * (slot_size + padding)
+                    y = start_y + row * (slot_size + padding)
+                    rect = pygame.Rect(x, y, slot_size, slot_size)
+                    
+                    if rect.collidepoint(mouse_pos):
+                        self.dragged_item = i
+                        break
+        
+        # Draw dragged item last (on top) if it exists
+        if self.dragged_item is not None:
+            if mouse_pressed[0]:
+                # Draw dragged item at mouse position
+                name, count = item_list[self.dragged_item]
                 item = Config.RESOURCE_ITEMS[name]
-                row = i // cols
-                col = i % cols
-                x = start_x + col * (slot_size + padding)
-                y = start_y + row * (slot_size + padding)
-
-                rect = pygame.Rect(x, y, slot_size, slot_size)
-                pygame.draw.rect(screen, (180, 180, 180), rect, 2)
                 img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-                screen.blit(img, (x + 5, y + 5))
+                screen.blit(img, (mouse_pos[0] - slot_size//2, mouse_pos[1] - slot_size//2))
+            else:
+                # Mouse released, check for drop
+                for i, (name, count) in enumerate(item_list):
+                    if count > 0:
+                        row = i // cols
+                        col = i % cols
+                        x = start_x + col * (slot_size + padding)
+                        y = start_y + row * (slot_size + padding)
+                        rect = pygame.Rect(x, y, slot_size, slot_size)
+                        
+                        if rect.collidepoint(mouse_pos) and i != self.dragged_item:
+                            # Swap items
+                            keys = list(self.items.keys())
+                            keys[self.dragged_item], keys[i] = keys[i], keys[self.dragged_item]
+                            self.items = defaultdict(int, {k: self.items[k] for k in keys})
+                self.dragged_item = None
 
-                count_surf = font.render(str(count), True, (255, 255, 255))
-                screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
+    def draw_inventory_item(self, screen, name, count, index, start_x, start_y, slot_size, padding, cols, font):
+        row = index // cols
+        col = index % cols
+        x = start_x + col * (slot_size + padding)
+        y = start_y + row * (slot_size + padding)
 
-    def show_notification(self, text, color):
-        font = pygame.font.SysFont(None, 30)
-        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
-        self.notification_time = pygame.time.get_ticks()
+        rect = pygame.Rect(x, y, slot_size, slot_size)
+        pygame.draw.rect(screen, (180, 180, 180), rect, 2)
+        
+        item = Config.RESOURCE_ITEMS[name]
+        img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+        screen.blit(img, (x + 5, y + 5))
+
+        count_surf = font.render(str(count), True, (255, 255, 255))
+        screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
+        def show_notification(self, text, color):
+            font = pygame.font.SysFont(None, 30)
+            self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+            self.notification_time = pygame.time.get_ticks()
 
     def toggle_inventory_view(self):
+        """Toggle between full inventory and hotbar view"""
         self.full_view = not self.full_view
+        self.show_swap_box = False  # Reset swap box when toggling
     
     def use_item(self, item_name):
         if self.items.get(item_name, 0) > 0:
@@ -502,7 +557,6 @@ class Inventory:
         with open("Data/inventory_usage.csv", "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([pygame.time.get_ticks(), item_name])
-
 
 
 class Stone:
