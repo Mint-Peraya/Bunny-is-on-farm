@@ -161,7 +161,7 @@ class Bunny:
         else:
             return (0 <= x < world.width and 
                     0 <= y < world.height and 
-                    world.tiles[y][x].type not in ('tree', 'stone'))
+                    world.tiles[y][x].type not in ('tree', 'stone','house'))
 
     def update_animation(self, moving):
         current_time = pygame.time.get_ticks()

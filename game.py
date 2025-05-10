@@ -8,19 +8,13 @@ from farm import *
 from dungeon import Dungeon 
 from stattk import *
 import tkinter as tk
-from tkinter import ttk
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import subprocess
 import sys
 import os
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, username='Unknown'):
         self.start_time = None
         self.previous_exit = None
         self.has_warped = False
@@ -30,10 +24,16 @@ class Game:
         self.clock = pygame.time.Clock()
         self.interact_font = pygame.font.Font(Config.get('font'), 24)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
-        self.reset_game()
-        self.bunny = Bunny(10, 10, mode='farm')  # Create the bunny object
-        self.dungeon = Dungeon(30, 30, self.bunny)  # Pass the bunny into Dungeon
-
+        
+        # Store username
+        self.username = username
+        
+        # Load saved game or initialize new game
+        self.reset_game(load_save=True)  # Modified to load save by default
+        
+        self.bunny = Bunny(10, 10, mode='farm', username=username)  # Pass username to Bunny
+        self.dungeon = Dungeon(30, 30, self.bunny)
+        
         self.last_log_time = pygame.time.get_ticks()
 
     def warp_to_dungeon(self):
@@ -99,14 +99,20 @@ class Game:
         self.maze.interactables.append(self.maze_enterportal)
         self.maze.interactables.append(self.maze_exitportal)
 
-    def reset_game(self):
-        self.farm = Farm(50, 30)  # No need to pass game instance
-        self.bunny = Bunny(1, 1, mode='farm')
+    def reset_game(self, load_save=False):
+        self.farm = Farm(50, 30)
+        self.bunny = Bunny(1, 1, mode='farm', username=self.username)
         self.init_portals()
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
         self.portal_cooldown = 0
-        self.dungeon = Dungeon(30, 30, self.bunny)  # Reinitialize dungeon
+        self.dungeon = Dungeon(30, 30, self.bunny)
+    
+        if load_save:
+            loaded = self.load_game()
+            if not loaded:
+                self.save_game()  # Auto-save for new users
+
 
     def handle_interactions(self):
         front_x, front_y = self.bunny.get_front_position()
@@ -291,6 +297,8 @@ class Game:
         moving = self.bunny.move(keys, world)
         self.bunny.update_animation(moving)
         self.bunny.update_action()
+        self.check_sleep_trigger()
+
 
         # Update world state
         if hasattr(world, 'update'):
@@ -323,10 +331,34 @@ class Game:
             time_taken = (end_time - self.dungeon_start_time) / 1000
             self.log_to_csv(time_taken, self.success)
     
+    def check_sleep_trigger(self):
+        bx, by = int(self.bunny.x), int(self.bunny.y)
+        # Door at (12, 15) which is center bottom tile of 4x6 house
+        if (bx, by) == (13, 14):
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_SPACE]:
+                self.sleep()
+
+    def sleep(self):
+        # Show sleep screen
+        sleep_overlay = pygame.Surface(Config.get('window'))
+        sleep_overlay.fill((0, 0, 0))
+        font = pygame.font.Font(None, 100)
+        text = font.render("Sleeping...", True, (255, 255, 255))
+        rect = text.get_rect(center=(Config.get('window')[0]//2, Config.get('window')[1]//2))
+        sleep_overlay.blit(text, rect)
+        self.screen.blit(sleep_overlay, (0, 0))
+        pygame.display.flip()
+        pygame.time.wait(2000)  # sleep effect 2 sec
+        self.farm.calendar.current_date += 1
+
+        self.save_game()
+
+
     def save_game(self):
         """Save current user's game state into a shared JSON file for all users."""
         try:
-            with open('save_game.json', 'r') as f:
+            with open('Data/save_game.json', 'r') as f:
                 all_saves = json.load(f)
         except FileNotFoundError:
             all_saves = {}
@@ -337,6 +369,7 @@ class Game:
         user_save = {
             "Day": self.farm.calendar.current_date,
             "Date": self.farm.calendar.current_day_name,  # e.g., "Mon", "Tue"
+            "Week": self.farm.calendar.current_week,
             "Season": self.farm.calendar.current_season,
             "Year":self.farm.calendar.current_year,
             "Time": "7:00",  # Reset daily
@@ -364,6 +397,55 @@ class Game:
             json.dump(all_saves, f, indent=4)
 
         print(f"Game saved for {username}")
+    
+    def load_game(self):
+        """Load the user's saved game state."""
+        try:
+            with open('Data/save_game.json', 'r') as f:
+                all_saves = json.load(f)
+                
+                if self.username in all_saves:
+                    save_data = all_saves[self.username]
+                    
+                    # Load calendar data
+                    self.farm.calendar.current_date = save_data.get("Day", 1)
+                    self.farm.calendar.current_day_name = save_data.get("Date", "Mon")
+                    self.farm.calendar.current_week = save_data.get("Week", 1)
+                    self.farm.calendar.current_season = save_data.get("Season", "Spring")
+                    self.farm.calendar.current_year = save_data.get("Year", 1)
+                    
+                    # Load bunny stats
+                    self.bunny.health = save_data.get("Health", 100)
+                    
+                    # Load inventory
+                    self.bunny.inventory.items = defaultdict(int, save_data.get("Inventory", {}))
+                    
+                    # Load crops
+                    for crop_data in save_data.get("CropStatus", []):
+                        x, y = crop_data["x"], crop_data["y"]
+                        if 0 <= x < self.farm.width and 0 <= y < self.farm.height:
+                            tile = self.farm.tiles[y][x]
+                            if crop_data["type"]:
+                                stages = []
+                                for i in range(1, Config.PLANT_CONFIG[crop_data["type"]]["stages"] + 1):
+                                    stage_img = Config.get('environ')[f'{crop_data["type"]}_stage{i}']
+                                    if stage_img:
+                                        stages.append(stage_img)
+                                
+                                if stages:
+                                    tile.plant = Plant(crop_data["type"], stages)
+                                    tile.plant.stage = crop_data.get("stage", 0)
+                                    tile.watered = crop_data.get("watered", False)
+                            tile.dug = True
+                    
+                    print(f"Game loaded for {self.username}")
+                else:
+                    print(f"No save found for {self.username}, starting new game")
+                    
+        except FileNotFoundError:
+            print("No save file found, starting new game")
+        except Exception as e:
+            print(f"Error loading game: {e}")
 
     def log_bunny_position(self):
         """Log bunny's (x, y) position to a CSV file."""

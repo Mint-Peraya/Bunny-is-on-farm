@@ -53,65 +53,12 @@ class Tile:
         y = self.tile_y * size - camera_y
 
         env_images = Config.get('environ')
-        base_image = env_images.get(self.type, env_images['dirt'])
 
-        # Default draw settings
-        draw_width, draw_height = size, size
-        offset_y = 0
-        scale = 1.0
-
-        # Custom scaling
-        if self.type == 'tree':
-            scale = self.tree_scale
-        elif self.type == 'stone':
-            scale = self.stone_scale
-
-        draw_width = int(size * scale)
-        draw_height = int(size * scale)
-        offset_y = size - draw_height  # tree/stone lifted from tile base
-
-        # Apply scaling and rotation
-        image = pygame.transform.scale(base_image, (draw_width, draw_height))
-        image = pygame.transform.rotate(image, self.image_rotation)
-
-        # Draw soft shadow
-        shadow = pygame.Surface((draw_width, draw_height // 4), pygame.SRCALPHA)
-        pygame.draw.ellipse(shadow, (0, 0, 0, 60), shadow.get_rect())
-        screen.blit(shadow, (x + (size - draw_width) // 2 + self.image_offset_x, y + size - draw_height // 4))
-
-        # Draw the object
-        screen.blit(image, (x + (size - draw_width) // 2 + self.image_offset_x, y + offset_y))
-
-        # Soil overlay if dug
-        if self.dug and self.type == 'dirt':
-            soil_overlay = env_images.get('soil_overlay')
-            if soil_overlay:
-                soil_overlay = pygame.transform.scale(soil_overlay, (size, size))
-                screen.blit(soil_overlay, (x, y))
-
-        # Health bar
-        if self.type in ('tree', 'stone') and self.health < self.max_health:
-            bar_width = size - 10
-            bar_height = 5
-            health_percent = self.health / self.max_health
-            pygame.draw.rect(screen, (255, 0, 0), (x + 5, y + 5, bar_width, bar_height))
-            pygame.draw.rect(screen, (0, 255, 0), (x + 5, y + 5, int(bar_width * health_percent), bar_height))
-
-        # Water overlay
-        if self.watered:
-            water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
-            water_overlay.fill((0, 100, 255, 60))
-            screen.blit(water_overlay, (x, y))
-    
-    def draw(self, screen, camera_x, camera_y):
-        size = Config.get('bun_size')
-        x = self.tile_x * size - camera_x
-        y = self.tile_y * size - camera_y
-
-        # Draw base tile
-        env_images = Config.get('environ')
-        base_image = env_images.get(self.type, env_images['dirt'])
-        screen.blit(pygame.transform.scale(base_image, (size, size)), (x, y))
+        if self.type == 'house':
+            pygame.draw.rect(screen, (150, 75, 0), (x, y, size, size))
+        else:
+            base_image = env_images.get(self.type, env_images['dirt'])
+            screen.blit(pygame.transform.scale(base_image, (size, size)), (x, y))
 
         # Draw soil overlay if dug
         if self.dug and self.type == 'dirt':
@@ -123,11 +70,12 @@ class Tile:
         if self.plant:
             self.plant.draw(screen, x, y, size)
 
-        # Draw other overlays (water, etc.)
+        # Draw water overlay
         if self.watered:
             water_overlay = pygame.Surface((size, size), pygame.SRCALPHA)
             water_overlay.fill((0, 100, 255, 60))
             screen.blit(water_overlay, (x, y))
+
 
     def update(self):
         if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
@@ -187,6 +135,12 @@ class Farm:
             self.tiles[y][x].health = 10
             self.tiles[y][x].max_health = 10
 
+        # Example manually placed house from (10, 16) to (10, 14)
+        for x in range(10, 16):  # 6 tiles wide
+            for y in range(10, 14):  # 4 tiles tall
+                self.tiles[y][x] = Tile('house', x, y)
+
+
     def handle_events(self, event):
         if event.type == pygame.KEYDOWN and event.key == pygame.K_e:
             self.game.bunny.check_for_interaction(self.interactables, self.game)
@@ -202,6 +156,14 @@ class Farm:
         for obj in self.interactables:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
+        
+        # Draw house image just once at (10,10)
+        house_img = Config.get('environ').get('house')
+        if house_img:
+            tile_size = Config.get('bun_size')
+            house_img = pygame.transform.scale(house_img, (tile_size * 10, tile_size * 8))
+            screen.blit(house_img, (8 * tile_size - camera_x, 8 * tile_size - camera_y))
+
         
 
 class Plant:
@@ -270,7 +232,7 @@ class Calendar:
         if self.current_date > 28:
             self.current_date = 1
             self.current_season_index = (self.current_season_index + 1) % 4
-            if self.current_season_index % 4 == 0 :
+            if self.current_season_index == 0:  # End of a season
                 self.current_year += 1
             
     @property
@@ -280,8 +242,12 @@ class Calendar:
     @property
     def current_day_name(self):
         return self.days_of_week[self.current_day]
+    
+    @property
+    def current_week(self):
+        # Calculate the current week (1-4)
+        return (self.current_date - 1) // 7 + 1
         
     def get_date_string(self):
-        return f"{self.current_day_name} {self.current_date}, {self.current_season}, Year {self.current_year}"
-    
-        i
+        # Return formatted string with the current day, date, season, week, and year
+        return f"{self.current_day_name} {self.current_date}, {self.current_season}, Week {self.current_week}, Year {self.current_year}"

@@ -64,6 +64,7 @@ class Config:
         'soil_overlay': pygame.image.load('assets/picture/soil_overlay.png').convert_alpha(),
         'tree': pygame.image.load('assets/picture/tree.png').convert_alpha(),
         'stone': pygame.image.load('assets/picture/stone.png').convert_alpha(),
+        'house': pygame.image.load("assets/bgimages/home.png").convert_alpha()
     }
     }
 
