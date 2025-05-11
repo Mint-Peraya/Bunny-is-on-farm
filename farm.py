@@ -402,3 +402,13 @@ class Mailbox:
             self.has_mail = False
             return True
         return False
+
+    def interact(self, game):
+        """Handle mailbox interaction"""
+        if not self.show_sell_menu:
+            if self.has_mail:
+                self.check_mail(game.bunny)
+            else:
+                self.show_sell_menu = True
+                game.bunny.current_interactable = self
+                

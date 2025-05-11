@@ -268,9 +268,12 @@ class Bunny:
     def can_interact_with(self, objects, world):
         for obj in objects:
             if self.is_near(obj):
-                obj.interact(world)
-                self.last_interacted = obj
-                break
+                # Check if object has interact method before calling it
+                if hasattr(obj, 'interact') and callable(obj.interact):
+                    obj.interact(world)
+                    self.last_interacted = obj
+                    return True
+        return False
 
     def is_near(self, obj):
         dx = self.x - obj.x
@@ -405,7 +408,6 @@ class Bunny:
                 proj['y'] * Config.get('bun_size') - camera_y
             ))
     
-    # In the Bunny class, handle the key presses for item selection
     def handle_key_press(self, event):
         if event.key == pygame.K_1:
             self.select_item_for_swap(0)
@@ -485,11 +487,6 @@ class Inventory:
             return True
         return False
     
-    def show_notification(self, text, color):
-        font = pygame.font.SysFont(None, 30)
-        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
-        self.notification_time = pygame.time.get_ticks()
-
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
         self.notification = (font.render(text, True, color), pygame.time.get_ticks())

@@ -29,6 +29,8 @@ class Game:
         self.mailbox = Mailbox(15, 14)  # Position near house
         self.warp_portal = Portal(self.farm.width - 3, self.farm.height - 2, 'random')
         self.farm.interactables.append(self.warp_portal)
+        # Position it in a walkable area
+        self.farm.tiles[self.farm.height - 2][self.farm.width - 3] = Tile('dirt', self.farm.width - 3, self.farm.height - 2)
         self.farm.interactables.append(self.mailbox)
         
         # Store username
@@ -174,17 +176,18 @@ class Game:
                 self.save_game()  # Auto-save for new users
 
     def handle_interactions(self):
-        for portal in self.farm.interactables:
-            if isinstance(portal, Portal) and portal.check_collision(self.bunny):
+        # First check portal interaction
+        for obj in self.farm.interactables:
+            if isinstance(obj, Portal) and obj.check_collision(self.bunny):
                 if pygame.key.get_pressed()[pygame.K_SPACE]:
-                    self.handle_teleport(portal)
+                    self.handle_teleport(obj)
                     return
-                
-        # Check mailbox interaction first
+        
+        # Then check mailbox interaction
         front_x, front_y = self.bunny.get_front_position()
         if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
             if pygame.key.get_pressed()[pygame.K_SPACE]:
-                self.handle_mailbox_interaction()
+                self.mailbox.interact(self)
                 return
         
         # Handle other interactions based on bunny's mode
@@ -314,7 +317,7 @@ class Game:
                     self.bunny.inventory.toggle_inventory_view()
                 elif event.key == pygame.K_SPACE:
                     if self.mailbox.show_sell_menu:
-                        self.mailbox.show_sell_menu = False
+                        self.mailbox.show_sell_menu = True
                         self.bunny.current_interactable = None
                     else:
                         self.handle_space_press()
@@ -360,15 +363,58 @@ class Game:
     def handle_space_press(self):
         if self.bunny.mode == 'farm':
             front_x, front_y = self.bunny.get_front_position()
+            
+            # Check mailbox interaction first
             if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
                 self.handle_mailbox_interaction()
                 return
-            self.bunny.can_interact_with(self.farm.interactables, self)
+                
+            # Check if standing on a portal (but don't interact automatically)
+            on_portal = False
+            for obj in self.farm.interactables:
+                if isinstance(obj, Portal) and (int(front_x), int(front_y)) == (obj.x, obj.y):
+                    on_portal = True
+                    break
+                    
+            # Only interact with non-portal objects
+            if not on_portal:
+                # Get tile in front of bunny
+                if 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
+                    tile = self.farm.tiles[front_y][front_x]
+                    
+                    # Handle tile-specific interactions
+                    if tile.type == 'tree':
+                        self.bunny.start_action('cut', tile)
+                    elif tile.type == 'stone':
+                        self.bunny.start_action('mine', tile)
+                    elif tile.type == 'dirt':
+                        if not tile.dug:
+                            self.bunny.start_action('dig', tile)
+                        elif tile.plant and tile.plant.harvestable:
+                            tile.harvest(self.bunny)
+                        elif tile.dug and not tile.plant:
+                            # Water the tile if empty and dug
+                            tile.water()
+                            
         elif self.bunny.mode == 'maze':
-            self.bunny.can_interact_with(self.maze.interactables, self)
+            # Only interact with non-portal objects in maze
+            front_x, front_y = self.bunny.get_front_position()
+            for obj in self.maze.interactables:
+                if not isinstance(obj, Portal) and (int(front_x), int(front_y)) == (obj.x, obj.y):
+                    obj.interact(self)
+                    
         elif self.bunny.mode == 'dungeon':
             self.bunny.throw_carrot()
-    
+
+    def handle_portal_interaction(self):
+        """Explicitly handle portal interaction when a specific key is pressed (like 'P')"""
+        if self.bunny.mode == 'farm':
+            front_x, front_y = self.bunny.get_front_position()
+            for obj in self.farm.interactables:
+                if isinstance(obj, Portal) and (int(front_x), int(front_y)) == (obj.x, obj.y):
+                    self.handle_teleport(obj)
+                    return
+        
     def ensure_data_files(self):
         """Ensure all data files exist with proper headers"""
         data_files = [
