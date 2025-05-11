@@ -32,4 +32,4 @@
 - Procedural generation for dungeons and mazes
 
 ## UML Class Diagram
-![UML Class Diagram](https://github.com/Mint-Peraya/Bunny-is-on-farm/blob/main/diagrams/uml.png)
+![UML Class Diagram](https://github.com/Mint-Peraya/Bunny-is-on-farm/Data/uml.png)
