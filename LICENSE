@@ -1,7 +1,3 @@
-To add proper credit for external resources to your MIT license while ensuring compliance, you should mention the resources and their creators as part of the license documentation. Here is an updated version of your MIT License, including appropriate credit for the resources you used:
-
----
-
 MIT License
 
 Copyright (c) 2025 Peraya Leangsongchai
@@ -21,6 +17,3 @@ Additionally, the following resources are used under their respective licenses a
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
----
-
-Make sure that when you distribute or release your software, the above credits are included and clear to users, either within the documentation or directly in the code.
