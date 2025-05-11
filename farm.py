@@ -135,12 +135,6 @@ class Tile:
                 self.plant = None
                 self.dug = False  # Undig the tile
  
-    def harvest(self):
-        if self.harvestable is True:
-            self.harvestable = False
-            return (self.config["harvest_item"], self.config["harvest_amount"])
-        return None
-
 
 class Farm:
     def __init__(self, width=50, height=30):

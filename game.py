@@ -201,22 +201,42 @@ class Game:
                     if pygame.key.get_pressed()[pygame.K_SPACE]:
                         self.handle_teleport(obj)
                         return
-
-        # Handle other interactions based on bunny's mode
+        
+        # Check for tile interactions (cut, mine, dig, water, harvest)
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
-            tile = self.farm.tiles[front_y][front_x]      
-            # Interactions for different types of tiles (tree, stone, dirt)
+            tile = self.farm.tiles[front_y][front_x]
+            
             if tile.type == 'tree':
-                self.bunny.start_action('cut', tile)  # Start cutting the tree
+                self.bunny.start_action('cut', tile)  # Cutting tree
             elif tile.type == 'stone':
-                self.bunny.start_action('mine', tile)  # Start mining the stone
+                self.bunny.start_action('mine', tile)  # Mining stone
             elif tile.type == 'dirt':
                 if not tile.dug:
-                    self.bunny.start_action('dig', tile)  # Start digging if not dug
+                    self.bunny.start_action('dig', tile)  # Digging tile
                 elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
-                    # Planting a seed if the tile is dug and the bunny has a seed
+                    # Planting a seed
                     crop_type = self.bunny.held_item.replace("_seed", "")
-                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):  # Check if seed can be used
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):
+                        stages = []
+                        for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
+                            stage_img = Config.get('environ')[f'{crop_type}_stage{i}']
+                            if stage_img:
+                                stages.append(stage_img)
+                        
+                        if stages:
+                            tile.plant = Plant(crop_type, stages)  # Plant the seed
+                            self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
+                
+                # Harvest the plant if present
+                elif tile.dug and tile.plant and tile.plant.harvestable:
+                    item, amount = tile.harvest()
+                    if item:
+                        self.bunny.add_to_inventory(item, amount)  # Add harvested item to inventory
+                        self.bunny.inventory.show_notification(f"Harvested {amount} {item}!", (0, 255, 0))
+                elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
+                    # Planting a new seed
+                    crop_type = self.bunny.held_item.replace("_seed", "")
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):
                         stages = []
                         for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
                             stage_img = Config.get('environ')[f'{crop_type}_stage{i}']
@@ -226,23 +246,6 @@ class Game:
                         if stages:
                             tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
-                elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
-                    crop_type = self.bunny.held_item.replace("_seed", "")
-                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):
-                        stages = []
-                        for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
-                            stage_img = Config.get('environ').get(f'{crop_type}_stage{i}')
-                            if stage_img:
-                                stages.append(stage_img)
-
-                        if stages:
-                            tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
-                            self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
-
-                elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
-                    # Water the tile if there's no seed in hand
-                    tile.water()
-                    self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
 
     def fade_transition(self):
         fade_surface = pygame.Surface(Config.get('window'))
@@ -406,7 +409,7 @@ class Game:
                         if not tile.dug:
                             self.bunny.start_action('dig', tile)
                         elif tile.plant and tile.plant.harvestable:
-                            tile.harvest()
+                            tile.harvest(self.bunny)
                         elif tile.dug and not tile.plant:
                             # Water the tile if empty and dug
                             tile.water()
