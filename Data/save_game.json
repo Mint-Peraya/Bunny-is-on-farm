@@ -1,19 +1,28 @@
 {
     "Unknown": {
-        "Day": 8,
-        "Date": "Thursday",
+        "Day": 12,
+        "Date": "Monday",
         "Week": 2,
         "Season": "Spring",
         "Year": 1,
         "Time": "7:00",
         "Health": 100,
-        "CropStatus": [],
+        "CropStatus": [
+            {
+                "x": 14,
+                "y": 14,
+                "type": null,
+                "stage": null,
+                "harvestable": false,
+                "watered": false
+            }
+        ],
         "Inventory": {
             "carrot_weapon": 1,
             "carrot_seed": 5,
             "potato_seed": 5
         },
-        "Money": 0,
+        "Money": 68,
         "Relationship": {}
     },
     "Mint": {

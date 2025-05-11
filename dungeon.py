@@ -1,14 +1,15 @@
 import pygame
-import math, csv
+import math
 import random
 from config import *
 from farm import Tile
 from bunny import *
 
 class Dungeon:
-    def __init__(self, width, height):
+    def __init__(self, width, height, bunny):
         self.width = width
         self.height = height
+        self.bunny = bunny  # Store reference to bunny object
         self.layout = [['#' for _ in range(width)] for _ in range(height)]
         self.exit_x = self.width - 2
         self.exit_y = self.height - 2
@@ -126,6 +127,7 @@ class Dungeon:
         floor_color = (200, 200, 200)  # Light gray floors
         tile_size = Config.get('bun_size')
         
+        # Draw dungeon tiles (walls and floors)
         for y in range(self.height):
             for x in range(self.width):
                 pos_x = x * tile_size - camera_x
@@ -138,6 +140,16 @@ class Dungeon:
                     pygame.draw.rect(screen, floor_color,
                                 (pos_x, pos_y, tile_size, tile_size))
         
+        # Render projectiles
+        for proj in self.bunny.carrot_weapon['projectiles']:
+            carrot_img = pygame.image.load('assets/items/carrot_weapon.png').convert_alpha()
+            scaled_img = pygame.transform.scale(carrot_img, 
+                                                (Config.get('bun_size') // 2, 
+                                                Config.get('bun_size') // 2))
+            screen.blit(scaled_img, 
+                        (proj['x'] * Config.get('bun_size') - camera_x,
+                        proj['y'] * Config.get('bun_size') - camera_y))
+        
         # Render enemies and loot boxes
         for enemy in self.enemies:
             enemy.render(screen, camera_x, camera_y)
@@ -149,6 +161,7 @@ class Dungeon:
         for obj in self.interactables:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
+
 
     def create_rooms_and_enemies(self):
         """Place enemies in rooms"""
@@ -395,3 +408,4 @@ class LootBox:
                             self.rect.y - camera_y + 5,
                             self.rect.width - 10,
                             self.rect.height - 10), 2)
+            

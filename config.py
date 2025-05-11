@@ -59,6 +59,9 @@ class Config:
         'yellow': (200, 200, 0),
         'font':"assets/fonts/pixel.ttf",
         'FPS': 60,
+        'projectile_images': {
+            'carrot': pygame.image.load('assets/items/carrot_weapon.png').convert_alpha()
+        },
         'environ':{
         'dirt': pygame.image.load('assets/picture/grass1.png').convert_alpha(),
         'soil_overlay': pygame.image.load('assets/picture/soil_overlay.png').convert_alpha(),

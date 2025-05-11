@@ -37,7 +37,7 @@ class Game:
         self.username = username
         
         self.bunny = Bunny(15, 15, mode='farm', username=username)  # Pass username to Bunny
-        self.dungeon = Dungeon(30, 30)
+        self.dungeon = Dungeon(30, 30,self.bunny)
         
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
@@ -83,7 +83,7 @@ class Game:
         self.bunny.mode = 'dungeon'
         
         # Reinitialize dungeon to ensure it's properly generated
-        self.dungeon = Dungeon(30, 30)
+        self.dungeon = Dungeon(30, 30,self.bunny)
         
         # Set position to a known walkable spot (near entrance portal)
         self.bunny.x, self.bunny.y = 1, 1
@@ -178,7 +178,7 @@ class Game:
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
         self.portal_cooldown = 0
-        self.dungeon = Dungeon(30, 30)
+        self.dungeon = Dungeon(30, 30,self.bunny)
     
         if load_save:
             loaded = self.load_game()
@@ -695,16 +695,24 @@ class Game:
         if keys[pygame.K_SPACE] and self.bunny.mode == 'dungeon':
             self.bunny.throw_carrot()
         
-        # Update projectiles
         if self.bunny.mode == 'dungeon':
+            # Update projectiles
+            self.bunny.update_projectiles(self.dungeon.enemies, self.dungeon)
+            
+            # Check for collisions between projectiles and enemies
             for proj in self.bunny.carrot_weapon['projectiles'][:]:
-                proj.update()
-                # Check for collisions with enemies
+                proj_rect = pygame.Rect(
+                    proj['x'] * Config.get('bun_size'),
+                    proj['y'] * Config.get('bun_size'),
+                    Config.get('bun_size') // 2,
+                    Config.get('bun_size') // 2
+                )
+                
                 for enemy in self.dungeon.enemies[:]:
-                    if self.check_collision(proj, enemy):
-                        enemy.take_damage(proj.damage)
-                        if proj in self.bunny.projectiles:
-                            self.bunny.projectiles.remove(proj)
+                    if proj_rect.colliderect(enemy.rect):
+                        enemy.take_damage(self.bunny.carrot_weapon['damage'])
+                        if proj in self.bunny.carrot_weapon['projectiles']:
+                            self.bunny.carrot_weapon['projectiles'].remove(proj)
                         break
         # Update camera
         self.update_camera()

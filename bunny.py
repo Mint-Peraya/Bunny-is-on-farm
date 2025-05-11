@@ -47,11 +47,11 @@ class Bunny:
 
         self.carrot_weapon = {
             'damage': 20,
-            'cooldown': 0,
-            'max_cooldown': 30,  # frames
-            'range': 5,  # tiles
-            'speed': 0.3,  # tiles per frame
-            'projectiles': []  # Active carrot projectiles
+            'cooldown': 0,  # We don't need cooldown for infinite shooting
+            'max_cooldown': 30,  # This can be removed as well
+            'range': 5,  # Maximum range for the carrot weapon
+            'speed': 0.3,  # Speed of the projectiles
+            'projectiles': []  # List to store active projectiles
         }
 
     def start_action(self, action_type, target_tile):
@@ -296,102 +296,85 @@ class Bunny:
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
-    # In the throw_carrot method in Bunny class (bunny.py)
     def throw_carrot(self):
-        if (self.carrot_weapon['cooldown'] <= 0 and 
-            'carrot_weapon' in self.inventory.items and 
-            self.inventory.items['carrot_weapon'] > 0 and
-            self.inventory.use_item('carrot_weapon')):  # Changed to use_item
-            self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']
-
-            # Create projectile based on facing direction
+        """Throw carrots continuously without cooldown."""
+        if 'carrot_weapon' in self.inventory.items and self.inventory.items['carrot_weapon'] > 0:
+            # Create a new projectile based on the current direction
             direction_map = {
                 'front': (0, 1),
                 'back': (0, -1),
                 'left': (-1, 0),
                 'right': (1, 0)
             }
-            dx, dy = direction_map.get(self.current_direction, (0, 1))
-            
+            dx, dy = direction_map.get(self.current_direction, (0, 1))  # Default to 'front'
+
+            # Add the new projectile to the projectiles list
             self.carrot_weapon['projectiles'].append({
                 'x': self.x,
                 'y': self.y,
                 'dx': dx * self.carrot_weapon['speed'],
                 'dy': dy * self.carrot_weapon['speed'],
-                'distance': 0
+                'distance': 0  # Initial distance is 0
             })
-            self.attacking = True
-            self.current_frame = 0
 
-            self.log_accuracy(success=False)
-    
+            self.attacking = True  # Set attacking state to true
+            self.current_frame = 0  # Reset the animation frame for attacking
+            self.inventory.use_item('carrot_weapon')  # Use the carrot weapon from the inventory
+
     def log_accuracy(self, success):
         with open("Data/combat_accuracy.csv", "a", newline="") as f:
             writer = csv.writer(f)
             writer.writerow([int(success)])  # 1 = hit, 0 = miss
 
     def update_projectiles(self, enemies, dungeon):
-        # Update cooldown
-        if self.carrot_weapon['cooldown'] > 0:
-            self.carrot_weapon['cooldown'] -= 1
-        
-        # Create a list of projectiles to remove
+        """Update existing projectiles."""
         projectiles_to_remove = []
-        
-        # Update existing projectiles
-        for proj in self.carrot_weapon['projectiles']:
+
+        for proj in self.carrot_weapon['projectiles'][:]:
             proj['x'] += proj['dx']
             proj['y'] += proj['dy']
             proj['distance'] += self.carrot_weapon['speed']
-            
-            # Check for hits
+
             proj_rect = pygame.Rect(
                 proj['x'] * Config.get('bun_size'),
                 proj['y'] * Config.get('bun_size'),
                 Config.get('bun_size') // 2,
                 Config.get('bun_size') // 2
             )
-            
-            # Check enemy collisions
+
+            # Check for enemy collisions
+            hit = False
             for enemy in enemies:
                 if proj_rect.colliderect(enemy.rect):
                     enemy.take_damage(self.carrot_weapon['damage'])
-
-                    # ✅ Log hit
-                    self.log_accuracy(success=True)
-
                     projectiles_to_remove.append(proj)
-                    break  # Stop checking other enemies for this projectile
+                    hit = True
+                    break
 
+            # If no enemy hit, check if projectile is out of bounds or max distance reached
+            if not hit:
                 screen_w, screen_h = Config.get('window')
-                if (proj['x'] < 0 or proj['x'] * Config.get('bun_size') > screen_w or
-                    proj['y'] < 0 or proj['y'] * Config.get('bun_size') > screen_h):
-                    self.log_accuracy(success=False)
+                if proj['x'] < 0 or proj['x'] * Config.get('bun_size') > screen_w or proj['y'] < 0 or proj['y'] * Config.get('bun_size') > screen_h:
                     projectiles_to_remove.append(proj)
 
-                    if self.name == "Player":
-                        self.log_accuracy(success=False)
+                # Check for wall collisions or max range
+                elif proj['distance'] >= self.carrot_weapon['range'] or not dungeon.is_tile_walkable(int(proj['x']), int(proj['y'])):
                     projectiles_to_remove.append(proj)
-                    for proj in projectiles_to_remove:
-                        if proj in self.carrot_weapon['projectiles']:
-                            self.carrot_weapon['projectiles'].remove(proj)
-            
-            # Check wall collisions or max range
-            if (proj['distance'] >= self.carrot_weapon['range'] or 
-                not dungeon.is_valid_position(proj['x'], proj['y'])):
-                projectiles_to_remove.append(proj)
-        
+
         # Remove marked projectiles
         for proj in projectiles_to_remove:
             if proj in self.carrot_weapon['projectiles']:
                 self.carrot_weapon['projectiles'].remove(proj)
 
     def draw_projectiles(self, screen, camera_x, camera_y):
-        carrot_img = pygame.image.load('assets/items/carrot_weapon.png').convert_alpha()
-        for proj in self.carrot_weapon['projectiles'][:]:
-            screen.blit(carrot_img, (proj['x'] * Config.get('bun_size') - camera_x, proj['y'] * Config.get('bun_size') - camera_y))
-    
-    # In the Bunny class, handle the key presses for item selection
+        """Draw the projectiles"""
+        for proj in self.carrot_weapon['projectiles']:
+            # Draw each projectile as a small circle for simplicity
+            pygame.draw.circle(screen, (255, 165, 0), 
+                            (proj['x'] * Config.get('bun_size') - camera_x, 
+                                proj['y'] * Config.get('bun_size') - camera_y), 5)
+
+
     def handle_key_press(self, event):
         if event.key == pygame.K_1:
             self.select_item_for_swap(0)
@@ -611,7 +594,8 @@ class Inventory:
     
     def use_item(self, item_name):
         if self.items.get(item_name, 0) > 0:
-            self.items[item_name] -= 1
+            if item_name != 'carrot_weapon':
+                self.items[item_name] -= 1
             self.log_item_use(item_name)
             return True
         return False
