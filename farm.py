@@ -5,7 +5,7 @@ from bunny import *
 
 
 class Tile:
-    def __init__(self, tile_type='dirt', x=0, y=0):
+    def __init__(self,tile_type='dirt', x=0, y=0):
         self.type = tile_type
         self.dug = False
         self.tile_x = x
@@ -22,6 +22,7 @@ class Tile:
         self.image_offset_x = random.randint(-4, 4) if self.type in ('tree', 'stone') else 0
         self.x = x
         self.y = y
+        self.harvestable = False
 
     @property
     def x(self):
@@ -137,7 +138,7 @@ class Tile:
                 self.dug = False  # Undig the tile
  
     def harvest(self):
-        if self.harvestable:
+        if self.harvestable is True:
             self.harvestable = False
             return (self.config["harvest_item"], self.config["harvest_amount"])
         return None

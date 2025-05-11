@@ -86,7 +86,6 @@ class Config:
         "stone": ResourceItem("stone", "assets/items/stone.png"),
         "carrot": ResourceItem("carrot", "assets/items/carrot.png"),
         "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
-        # "seed": ResourceItem("seed", "assets/items/seed.png"),
         "carrot_seed": ResourceItem("carrot_seed", "assets/plants/carrot_seed.png"),
         "potato_seed": ResourceItem("potato_seed", "assets/plants/potato_seed.png"),
         "radish_seed": ResourceItem("radish_seed", "assets/plants/radish_seed.png"),

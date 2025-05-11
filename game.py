@@ -42,6 +42,7 @@ class Game:
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
             self.handle_new_player()
+            self.give_starter_kit()
 
         self.reset_game(load_save=True)  # Modified to load save by default
     
@@ -226,9 +227,9 @@ class Game:
                         if stages:
                             tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
-                elif tile.dug and tile.plant and tile.plant.harvestable:
+                elif tile.dug and tile.plant and (tile.plant.harvestable is True):
                         # Harvest crop if the plant is ready
-                        result = tile.harvest(self.bunny)
+                        result = tile.harvest()
                         if result:
                             item, amount = result
                             self.bunny.add_to_inventory(item, amount)
@@ -407,7 +408,7 @@ class Game:
                         elif tile.dug and not tile.plant:
                             tile.water()
                         else:
-                            tile.harvest(self.bunny)
+                            tile.harvest()
                        
                                             
         elif self.bunny.mode == 'maze':

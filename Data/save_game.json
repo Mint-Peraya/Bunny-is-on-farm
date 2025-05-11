@@ -1,30 +1,4 @@
 {
-    "Unknown": {
-        "Day": 19,
-        "Date": "Monday",
-        "Week": 3,
-        "Season": "Spring",
-        "Year": 1,
-        "Time": "7:00",
-        "Health": 100,
-        "CropStatus": [
-            {
-                "x": 14,
-                "y": 14,
-                "type": null,
-                "stage": null,
-                "harvestable": false,
-                "watered": false
-            }
-        ],
-        "Inventory": {
-            "carrot_weapon": 1,
-            "carrot_seed": 5,
-            "potato_seed": 5
-        },
-        "Money": 29,
-        "Relationship": {}
-    },
     "Mint": {
         "Day": 1,
         "Date": "Sunday",
@@ -40,6 +14,23 @@
             "potato_seed": 5
         },
         "Money": 200,
+        "Relationship": {}
+    },
+    "Unknown": {
+        "Day": 1,
+        "Date": "Sunday",
+        "Week": 1,
+        "Season": "Spring",
+        "Year": 1,
+        "Time": "7:00",
+        "Health": 100,
+        "CropStatus": [],
+        "Inventory": {
+            "carrot_weapon": 1,
+            "carrot_seed": 5,
+            "potato_seed": 5
+        },
+        "Money": 0,
         "Relationship": {}
     }
 }
