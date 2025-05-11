@@ -21,17 +21,16 @@ class ResourceItem:
         self.name = name
         try:
             self.image = pygame.image.load(image_path).convert_alpha()
-        except:
+        except FileNotFoundError:
+            print(f"Error: Image for {name} not found at {image_path}")
             self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
             self.image.fill((50, 50, 50, 255))  # dark gray background
-
             # Render the name on the fallback surface
             font = pygame.font.SysFont("arial", 10, bold=True)
             text_surface = font.render(self.name, True, (255, 255, 255))  # white text
-
-            # Center the text
             text_rect = text_surface.get_rect(center=(16, 16))
             self.image.blit(text_surface, text_rect)
+
 
 
 class Config:

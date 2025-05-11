@@ -42,7 +42,6 @@ class Game:
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
             self.handle_new_player()
-            self.give_starter_kit()
 
         self.reset_game(load_save=True)  # Modified to load save by default
     
@@ -227,7 +226,7 @@ class Game:
                         if stages:
                             tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
-                elif tile.dug and tile.plant and (tile.plant.harvestable is True):
+                elif tile.dug and tile.plant and tile.plant.harvestable:
                         # Harvest crop if the plant is ready
                         result = tile.harvest()
                         if result:
@@ -405,12 +404,12 @@ class Game:
                     elif tile.type == 'dirt':
                         if not tile.dug:
                             self.bunny.start_action('dig', tile)
-                        elif tile.dug and not tile.plant:
-                            tile.water()
-                        else:
+                        elif tile.plant and tile.plant.harvestable:
                             tile.harvest()
-                       
-                                            
+                        elif tile.dug and not tile.plant:
+                            # Water the tile if empty and dug
+                            tile.water()
+                            
         elif self.bunny.mode == 'maze':
             # Only interact with non-portal objects in maze
             front_x, front_y = self.bunny.get_front_position()
@@ -462,6 +461,41 @@ class Game:
         self.farm_portal.draw(self.screen, self.camera_x, self.camera_y)
         self.mailbox.draw(self.screen, self.camera_x, self.camera_y)
 
+    def log_to_csv(self, time_taken, success):
+        """Log game results to maze_log.csv"""
+        try:
+            os.makedirs('Data', exist_ok=True)
+            file_path = 'Data/maze_log.csv'
+
+            write_header = not os.path.exists(file_path)
+
+            with open(file_path, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                if write_header:
+                    writer.writerow(["timestamp", "username", "time_taken", "result"])
+
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                result = "win" if success else "lose"
+                if result == 'win':
+                    result == True
+                elif result == 'lose':
+                    result == False
+                writer.writerow([ time_taken, result])
+
+            print(f"Logged {result} for {self.username}.")
+        except Exception as e:
+            print(f"Error logging maze data: {e}")
+
+            if success:
+                # Add rewards to mailbox
+                rewards = []
+                if self.bunny.mode == 'maze':
+                    rewards.append(('diamond', 5))
+                    rewards.append(('carrot', 3))
+                    rewards.append(('stone', 5))
+    
+                self.mailbox.add_mail(rewards)
+                self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
 
     def send_seeds(self):
         """Send seeds every Saturday"""
@@ -840,6 +874,12 @@ class Game:
         except Exception as e:
             print(f"Error loading game: {e}")
 
+    def log_bunny_position(self):
+        """Log bunny's (x, y) position to a CSV file."""
+        with open('Data/bunny_positions.csv', mode='a', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerow([round(self.bunny.x), round(self.bunny.y)])
+
     def end_game(self):
         """End the game and show statistics"""
         print("Game ended. Opening StatsApp...")
@@ -907,6 +947,38 @@ class Game:
         self.update_camera(instant=True)
         self.save_game()
 
+    def log_harvest(self, crop_type, amount):
+        """Log harvested crops with week and season info"""
+        try:
+            file_path = 'Data/Crop.csv'
+            with open(file_path, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                if f.tell() == 0:  # Write header if file is empty
+                    writer.writerow(["timestamp", "week", "season", "crop_type", "amount"])
+            
+                writer.writerow([
+                    self.farm.calendar.current_week,
+                    self.farm.calendar.current_season,
+                    crop_type, 
+                    amount
+                ])
+        except Exception as e:
+            print(f"Error logging harvest: {e}")
+
+    def log_attack(self, success):
+        """Log combat accuracy"""
+        try:
+            file_path = 'Data/combat_accuracy.csv'
+            with open(file_path, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                if f.tell() == 0:  # Write header if file is empty
+                    writer.writerow(["timestamp", "success"])
+                
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                writer.writerow([int(success)])
+        except Exception as e:
+            print(f"Error logging attack: {e}")
+
     def handle_teleport(self, portal):
         """Handle portal teleportation based on portal type"""
         if portal.cooldown > 0:
@@ -933,84 +1005,6 @@ class Game:
                 self.plant = None
                 return True
         return False
-
-    def log_to_csv(self, time_taken, success):
-        """Log game results to maze_log.csv"""
-        try:
-            file_path = 'Data/maze_log.csv'
-            write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
-
-            with open(file_path, mode='a', newline='') as file:
-                writer = csv.writer(file)
-                if write_header:
-                    writer.writerow(["time_taken(s)", "Success_status"])
-
-                writer.writerow([time_taken, success])
-            print(f"Logged maze attempt: {time_taken}s, success={success}")
-        except Exception as e:
-            print(f"Error logging maze data: {e}")
-
-    def log_bunny_position(self):
-        """Log bunny's (x, y) position to a CSV file."""
-        try:
-            file_path = 'Data/bunny_positions.csv'
-            write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
-
-            with open(file_path, mode='a', newline='') as file:
-                writer = csv.writer(file)
-                if write_header:
-                    writer.writerow(["x", "y"])
-                writer.writerow([round(self.bunny.x, 2), round(self.bunny.y, 2)])
-        except Exception as e:
-            print(f"Error logging bunny position: {e}")
-
-    def log_attack(self, success):
-        """Log combat accuracy"""
-        try:
-            file_path = 'Data/combat_accuracy.csv'
-            write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
-
-            with open(file_path, mode='a', newline='') as f:
-                writer = csv.writer(f)
-                if write_header:
-                    writer.writerow(["Hit"])
-                writer.writerow([int(success)])
-        except Exception as e:
-            print(f"Error logging attack: {e}")
-
-    def log_item_use(self, item_name):
-        """Log inventory usage"""
-        try:
-            file_path = 'Data/inventory_usage.csv'
-            write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
-
-            with open(file_path, mode='a', newline='') as f:
-                writer = csv.writer(f)
-                if write_header:
-                    writer.writerow(["item_name"])
-                writer.writerow([item_name])
-        except Exception as e:
-            print(f"Error logging item use: {e}")
-
-    def log_harvest(self, crop_type, amount):
-        """Log harvested crops with week and season info"""
-        try:
-            file_path = 'Data/Crop.csv'
-            write_header = not os.path.exists(file_path) or os.stat(file_path).st_size == 0
-
-            with open(file_path, mode='a', newline='') as f:
-                writer = csv.writer(f)
-                if write_header:
-                    writer.writerow(["Week", "Season", "Crop", "Amount"])
-                writer.writerow([
-                    self.farm.calendar.current_week,
-                    self.farm.calendar.current_season,
-                    crop_type, 
-                    amount
-                ])
-        except Exception as e:
-            print(f"Error logging harvest: {e}")  
-
-
+    
 if __name__ == "__main__":
     Game().run()

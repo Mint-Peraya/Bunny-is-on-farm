@@ -5,7 +5,7 @@ from collections import defaultdict
 
 
 class Bunny:
-    def __init__(self, x, y, mode='farm', username='Unknown'):
+    def __init__(self, x, y, mode='farm',username = 'Unknown'):
         self.name = username
         self.x, self.y = x, y
         self.health = 100
@@ -23,6 +23,7 @@ class Bunny:
             Config.get('bun_size')
         )
 
+        self.attack_cooldown = 0
         self.attacking = False
         self.current_frame = 0
         self.frame_time = 1000 // Config.get('FPS')
@@ -52,20 +53,6 @@ class Bunny:
             'speed': 0.3,  # Speed of the projectiles
             'projectiles': []  # List to store active projectiles
         }
-
-    def record_enemy_event(self, enemy_type, event):
-        """Record each kill or faint event for an enemy type to CSV."""
-        with open("Data/Enemy_difficulty.csv", "a", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow([enemy_type, event])
-
-    def record_kill(self, enemy_type):
-        """Log a kill event."""
-        self.record_enemy_event(enemy_type, "kill")
-
-    def record_death(self, enemy_type):
-        """Log a faint (death) event."""
-        self.record_enemy_event(enemy_type, "fainted")
 
     def start_action(self, action_type, target_tile):
         """Start an action with progress tracking"""
@@ -378,19 +365,16 @@ class Bunny:
         for proj in projectiles_to_remove:
             if proj in self.carrot_weapon['projectiles']:
                 self.carrot_weapon['projectiles'].remove(proj)
-    
+
     def draw_projectiles(self, screen, camera_x, camera_y):
-        """Draw the projectiles using the carrot weapon image"""
-        carrot_img = Config.get('projectile_images')['carrot']
-        scaled_img = pygame.transform.scale(carrot_img, 
-                                        (Config.get('bun_size') // 2, 
-                                        Config.get('bun_size') // 2))
-        
+        """Draw the projectiles"""
         for proj in self.carrot_weapon['projectiles']:
-            screen.blit(scaled_img,
-                    (proj['x'] * Config.get('bun_size') - camera_x,
-                    proj['y'] * Config.get('bun_size') - camera_y))
-        
+            # Draw each projectile as a small circle for simplicity
+            pygame.draw.circle(screen, (255, 165, 0), 
+                            (proj['x'] * Config.get('bun_size') - camera_x, 
+                                proj['y'] * Config.get('bun_size') - camera_y), 5)
+
+
     def handle_key_press(self, event):
         if event.key == pygame.K_1:
             self.select_item_for_swap(0)
@@ -420,100 +404,20 @@ class Bunny:
                     self.held_item = items_list[item_index][0]
                     print(f"Now holding: {self.held_item}")  # Debug output
 
-    def update(self, keys, world):
-        moving = self.move(keys, world)
-        self.update_animation(moving)
-        self.update_action()
-        
-        # Continuous carrot throwing when holding space in dungeon mode
-        if self.mode == 'dungeon' and keys[pygame.K_SPACE]:
-            self.throw_carrot()
-        
-        # Update projectiles if in dungeon mode
-        if self.mode == 'dungeon':
-            self.update_projectiles()
 
 class Inventory:
     def __init__(self, capacity=20):
         self.capacity = capacity
         self.items = defaultdict(int)
-        self.hotbar = [None] * 6  # Stores item names directly
-        self.hotbar_indices = [None] * 6  
-        self.selected_slot = 0
-        self.notification = None
-        self.notification_time = 0
+        # Initialize hotbar with first 6 items if they exist
+        self.hotbar_indices = [i if i < capacity else None for i in range(6)]
+        self.swap_selected_index = None
+        self.swap_input_text = ""
+        self.show_swap_box = False
         self.full_view = False
         self.dragged_item = None
-        self.swap_selected_index = None  
-
-    def add_item(self, item_name, amount=1):
-        """Add item to inventory and auto-assign to first empty hotbar slot"""
-        if sum(self.items.values()) + amount <= self.capacity:
-            self.items[item_name] += amount
-            
-            # Auto-assign to first empty hotbar slot if not already present
-            if item_name not in self.hotbar:
-                for i in range(len(self.hotbar)):
-                    if self.hotbar[i] is None:
-                        self.hotbar[i] = item_name
-                        break
-            return True
-        return False
-
-    def use_item(self, item_name, amount=1):
-        """Use an item from inventory and clear hotbar slot if depleted"""
-        if self.items.get(item_name, 0) >= amount:
-            self.items[item_name] -= amount
-            if self.items[item_name] <= 0:
-                del self.items[item_name]
-                # Remove from hotbar if present
-                if item_name in self.hotbar:
-                    index = self.hotbar.index(item_name)
-                    self.hotbar[index] = None
-            return True
-        return False
-
-    def draw_quick_bar(self, screen):
-        """Draw only the 6 slots of the hotbar with selection highlight"""
-        slot_size = 64
-        padding = 5
-        start_x = (screen.get_width() - (slot_size + padding) * 6) // 2
-        y = screen.get_height() - slot_size - 10
-
-        for i in range(6):
-            # Draw slot background
-            color = (200, 200, 200) if i != self.selected_slot else (255, 255, 0)
-            rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
-            pygame.draw.rect(screen, (50, 50, 50), rect)  # Dark background
-            pygame.draw.rect(screen, color, rect, 2)  # Border
-
-            # Draw item if present
-            item_name = self.hotbar[i]
-            if item_name and item_name in self.items and self.items[item_name] > 0:
-                if item_name in Config.RESOURCE_ITEMS:
-                    item = Config.RESOURCE_ITEMS[item_name]
-                    img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-                    screen.blit(img, (rect.x + 5, rect.y + 5))
-                    
-                    # Draw item count
-                    font = pygame.font.SysFont(None, 22)
-                    count_surface = font.render(str(self.items[item_name]), True, (255, 255, 255))
-                    screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
-
-        # Draw notification if present
-        if self.notification and pygame.time.get_ticks() - self.notification_time < 3000:
-            text_surface, _ = self.notification
-            text_rect = text_surface.get_rect(center=(screen.get_width()//2, y - 20))
-            screen.blit(text_surface, text_rect)
-
-    def select_hotbar_slot(self, slot_index):
-        """Select a hotbar slot (0-5)"""
-        if 0 <= slot_index < 6:
-            self.selected_slot = slot_index
-            item_name = self.hotbar[slot_index]
-            if item_name and item_name in self.items:
-                return item_name
-        return None
+        self.notification = None
+        self.notification_time = 0
 
     def is_full(self):
         return sum(self.items.values()) >= self.capacity
@@ -528,6 +432,32 @@ class Inventory:
             idx if idx is not None and idx < len(self.items) else None
             for idx in self.hotbar_indices
         ]
+
+    def add_item(self, item):
+        """Add item to inventory - accepts either ResourceItem object or string name"""
+        if hasattr(item, 'name'):
+            item_name = item.name
+        else:
+            item_name = item
+            item = Config.RESOURCE_ITEMS.get(item_name, None)
+        
+        if not self.is_full():
+            # If this is a new item type, add it to the inventory
+            if item_name not in self.items:
+                # Find the first empty hotbar slot if available
+                for i in range(len(self.hotbar_indices)):
+                    if self.hotbar_indices[i] is None:
+                        self.hotbar_indices[i] = len(self.items)
+                        break
+            
+            self.items[item_name] = self.items.get(item_name, 0) + 1
+            return True
+        return False
+    
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
 
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
@@ -554,10 +484,9 @@ class Inventory:
 
             item_index = self.hotbar_indices[i]
             if item_index is not None and item_index < len(self.items):
-                item_name = list(self.items.keys())[item_index]
-                count = self.items[item_name]
-                if count > 0 and item_name in Config.RESOURCE_ITEMS:  # Check if valid item
-                    item = Config.RESOURCE_ITEMS[item_name]  # Get ResourceItem here
+                item_name, count = list(self.items.items())[item_index]
+                if count > 0:
+                    item = Config.RESOURCE_ITEMS[item_name]
                     img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
                     screen.blit(img, (rect.x + 5, rect.y + 5))
                     font = pygame.font.SysFont(None, 22)
@@ -639,32 +568,37 @@ class Inventory:
                 self.dragged_item = None
 
     def draw_inventory_item(self, screen, name, count, index, start_x, start_y, slot_size, padding, cols, font):
-        # If `name` is a ResourceItem, get the string name using name.name
-        if isinstance(name, ResourceItem):
-            item_name = name.name  # Get the name string from the ResourceItem object
-        else:
-            item_name = name  # If name is already a string, use it directly
+        row = index // cols
+        col = index % cols
+        x = start_x + col * (slot_size + padding)
+        y = start_y + row * (slot_size + padding)
 
-        # Now access the item in the RESOURCE_ITEMS dictionary
-        item = Config.RESOURCE_ITEMS[item_name]
-
-        # Draw the item (assuming item.image exists)
+        rect = pygame.Rect(x, y, slot_size, slot_size)
+        pygame.draw.rect(screen, (180, 180, 180), rect, 2)
+        
+        item = Config.RESOURCE_ITEMS[name]
         img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-        screen.blit(img, (start_x + (index % cols) * (slot_size + padding), start_y + (index // cols) * (slot_size + padding)))
+        screen.blit(img, (x + 5, y + 5))
 
-        # Optionally, draw item count
-        count_surface = font.render(str(count), True, (255, 255, 255))
-        screen.blit(count_surface, (start_x + (index % cols) * (slot_size + padding), start_y + (index // cols) * (slot_size + padding) + slot_size - 20))
-
-    def show_notification(self, text, color):
-        font = pygame.font.SysFont(None, 30)
-        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
-        self.notification_time = pygame.time.get_ticks()
+        count_surf = font.render(str(count), True, (255, 255, 255))
+        screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
+        def show_notification(self, text, color):
+            font = pygame.font.SysFont(None, 30)
+            self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+            self.notification_time = pygame.time.get_ticks()
 
     def toggle_inventory_view(self):
         """Toggle between full inventory and hotbar view"""
         self.full_view = not self.full_view
         self.show_swap_box = False  # Reset swap box when toggling
+    
+    def use_item(self, item_name):
+        if self.items.get(item_name, 0) > 0:
+            if item_name != 'carrot_weapon':
+                self.items[item_name] -= 1
+            self.log_item_use(item_name)
+            return True
+        return False
 
     def log_item_use(self, item_name):
         with open("Data/inventory_usage.csv", "a", newline="") as f:
