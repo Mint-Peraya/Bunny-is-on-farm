@@ -438,9 +438,13 @@ class Inventory:
         self.capacity = capacity
         self.items = defaultdict(int)
         self.hotbar = [None] * 6  # Stores item names directly
+        self.hotbar_indices = [None] * 6  
         self.selected_slot = 0
         self.notification = None
         self.notification_time = 0
+        self.full_view = False
+        self.dragged_item = None
+        self.swap_selected_index = None  
 
     def add_item(self, item_name, amount=1):
         """Add item to inventory and auto-assign to first empty hotbar slot"""
@@ -635,30 +639,33 @@ class Inventory:
                 self.dragged_item = None
 
     def draw_inventory_item(self, screen, name, count, index, start_x, start_y, slot_size, padding, cols, font):
-        row = index // cols
-        col = index % cols
-        x = start_x + col * (slot_size + padding)
-        y = start_y + row * (slot_size + padding)
+        # If `name` is a ResourceItem, get the string name using name.name
+        if isinstance(name, ResourceItem):
+            item_name = name.name  # Get the name string from the ResourceItem object
+        else:
+            item_name = name  # If name is already a string, use it directly
 
-        rect = pygame.Rect(x, y, slot_size, slot_size)
-        pygame.draw.rect(screen, (180, 180, 180), rect, 2)
-        
-        item = Config.RESOURCE_ITEMS[name]
+        # Now access the item in the RESOURCE_ITEMS dictionary
+        item = Config.RESOURCE_ITEMS[item_name]
+
+        # Draw the item (assuming item.image exists)
         img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
-        screen.blit(img, (x + 5, y + 5))
+        screen.blit(img, (start_x + (index % cols) * (slot_size + padding), start_y + (index // cols) * (slot_size + padding)))
 
-        count_surf = font.render(str(count), True, (255, 255, 255))
-        screen.blit(count_surf, (x + slot_size - 35, y + slot_size - 20))
-        def show_notification(self, text, color):
-            font = pygame.font.SysFont(None, 30)
-            self.notification = (font.render(text, True, color), pygame.time.get_ticks())
-            self.notification_time = pygame.time.get_ticks()
+        # Optionally, draw item count
+        count_surface = font.render(str(count), True, (255, 255, 255))
+        screen.blit(count_surface, (start_x + (index % cols) * (slot_size + padding), start_y + (index // cols) * (slot_size + padding) + slot_size - 20))
+
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
 
     def toggle_inventory_view(self):
         """Toggle between full inventory and hotbar view"""
         self.full_view = not self.full_view
         self.show_swap_box = False  # Reset swap box when toggling
-    
+
     def log_item_use(self, item_name):
         with open("Data/inventory_usage.csv", "a", newline="") as f:
             writer = csv.writer(f)
