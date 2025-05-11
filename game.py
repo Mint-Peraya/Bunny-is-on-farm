@@ -13,6 +13,7 @@ class Game:
     def __init__(self, username='Unknown'):
         # Ensure the 'Data' directory exists
         os.makedirs('Data', exist_ok=True)
+        self.ensure_data_files()
 
         self.start_time = None
         self.previous_exit = None
@@ -39,29 +40,16 @@ class Game:
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
             self.handle_new_player()
-            self.give_starter_kit()
 
         self.reset_game(load_save=True)  # Modified to load save by default
     
     def give_starter_kit(self):
         """Give new players essential starting items"""
-        starter_items = {
-            "carrot_seed": 5,
-            "potato_seed": 3,
-            "axe": 1,
-            "carrot_weapon": 1
-        }
-
+        self.bunny.add_to_inventory("carrot_weapon")
+        self.bunny.add_to_inventory("carrot_seed",5)
+        self.bunny.add_to_inventory("potato_seed",5)
         # Give money separately
-        self.bunny.money = 200  # Starting money
-
-        for item_name, quantity in starter_items.items():
-            # Get the actual ResourceItem object from Config
-            item = Config.RESOURCE_ITEMS.get(item_name)
-            if item:
-                for _ in range(quantity):
-                    self.bunny.inventory.add_item(item)
-                    print(f"Added {item_name} to inventory")  # Debug statement to verify addition
+        self.bunny.money += 200  # Starting money
 
         self.bunny.inventory.show_notification("Received starter kit!", (0, 255, 0))
 
@@ -132,6 +120,7 @@ class Game:
         BigScene(self.screen,self.clock,txt2,Config.get('font'),40).run()
         BigScene(self.screen,self.clock,txt3,Config.get('font'),40).run()
         BigScene(self.screen,self.clock,txt5,Config.get('font'),40).run()
+        self.give_starter_kit()
         self.save_game()    
 
     def warp_to_farm(self):
@@ -202,19 +191,18 @@ class Game:
             elif tile.type == 'dirt':
                 if not tile.dug:
                     self.bunny.start_action('dig', tile)
+                # In the handle_interactions method in Game class (game.py)
                 elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
                     crop_type = self.bunny.held_item.replace("_seed", "")
-                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.items.get(self.bunny.held_item, 0) > 0:
-                        # Get all stages for this crop
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):  # Changed to use_item
                         stages = []
                         for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
                             stage_img = Config.get('environ')[f'{crop_type}_stage{i}']
                             if stage_img:
                                 stages.append(stage_img)
                         
-                        if stages:  # Only plant if we have all required stages
+                        if stages:
                             tile.plant = Plant(crop_type, stages)
-                            self.bunny.inventory.items[self.bunny.held_item] -= 1
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
                 elif tile.dug and tile.plant and tile.plant.harvestable:
                     crop_type = tile.plant.crop_type
@@ -242,46 +230,40 @@ class Game:
             pygame.time.delay(30)
 
     def render_ui(self):
-        """Render UI elements"""
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
         front_x, front_y = self.bunny.get_front_position()
         if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
-            self.mailbox.draw_interaction(self.screen)
+            text = "Check Mail (SPACE)" if self.mailbox.has_mail else "Open Shop (SPACE)"
+            font = pygame.font.Font(Config.get('font'), 24)
+            text_surface = font.render(text, True, (255, 255, 255))
+            self.screen.blit(text_surface, (10, 10))
         
-        # Draw Health
         self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
-        
-        # Draw day
-        pygame.draw.rect(self.screen, Config.get('brown'), (490, 10, 500, 30), 0,border_radius=10)
+        pygame.draw.rect(self.screen, Config.get('brown'), (490, 10, 500, 30), 0, border_radius=10)
         date_text = self.farm.calendar.get_date_string()
         self.draw_text(date_text, 25, Config.get('sky'), (500, 10))
 
-        # Draw interaction prompt if near something
         if self.bunny.current_interactable:
-            if hasattr(self.bunny.current_interactable, 'interact_text'):
-                text = self.bunny.current_interactable.interact_text
-            elif isinstance(self.bunny.current_interactable, Tile):
+            if isinstance(self.bunny.current_interactable, Tile):
                 if self.bunny.current_interactable.type == 'tree':
                     text = "Chop tree (SPACE)"
                 elif self.bunny.current_interactable.type == 'stone':
                     text = "Mine stone (SPACE)"
             else:
                 text = "Interact (SPACE)"
-            
             self.draw_text(text, 24, Config.get('white'), (10, 80))
         
-        # Draw inventory
+        self.draw_text((f"Holding:{self.bunny.held_item}"), 25 ,Config.get('white'), (10, 80))
         self.bunny.inventory.draw(self.screen)
-
-        # Draw money
         moneytxt = f"Money: {self.bunny.money}"
         self.draw_text(moneytxt, 25, Config.get('white'), (10, 50))
-        
 
-        # Draw compass in maze mode
         if self.bunny.mode == 'maze' and not self.game_over:
             self.maze.draw_compass(self.screen, self.bunny, self.exit)
-
+        
+        # Draw mailbox menu if open
+        self.draw_mailbox_menu()
+        
     def update_camera(self, instant=False):
         """Smoothly follow bunny with camera"""
         target_x = self.bunny.x * Config.get('bun_size') - Config.get('wx') // 2
@@ -294,20 +276,18 @@ class Game:
             self.camera_y += (target_y - self.camera_y) * 0.1
 
     def handle_events(self):
-        """Process user input"""
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     self.reset_game()
-                elif event.key == pygame.K_m:  # Manual mode switch for testing
+                elif event.key == pygame.K_m:
                     self.bunny.switch_mode()
-                elif event.key == pygame.K_i:  # Toggle inventory view
+                elif event.key == pygame.K_i:
                     self.bunny.inventory.toggle_inventory_view()
                 elif event.key == pygame.K_SPACE:
                     if self.mailbox.show_sell_menu:
-                        # If sell menu is open, close it on SPACE
                         self.mailbox.show_sell_menu = False
                         self.bunny.current_interactable = None
                     else:
@@ -316,29 +296,14 @@ class Game:
                     if self.mailbox.show_sell_menu:
                         self.mailbox.show_sell_menu = False
                         self.bunny.current_interactable = None
-                        continue  # Skip other handling when closing menu
-                elif event.key == pygame.K_1 and self.bunny.inventory.full_view:
-                    # Hotkey for slot 1
-                    self.bunny.inventory.hotbar_indices[0] = self.bunny.inventory.swap_selected_index
-                    self.bunny.inventory.swap_selected_index = None
-                elif event.key == pygame.K_2 and self.bunny.inventory.full_view:
-                    # Hotkey for slot 2
-                    self.bunny.inventory.hotbar_indices[1] = self.bunny.inventory.swap_selected_index
-                    self.bunny.inventory.swap_selected_index = None
-                # Add similar cases for keys 3-6 if needed
-                
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left mouse click
-                    if self.mailbox.show_sell_menu:
-                        # Handle clicks in sell menu (including clicking outside to close)
-                        if not self.mailbox.handle_click(event.pos, self):
-                            # If click wasn't handled by menu (clicked outside)
-                            self.mailbox.show_sell_menu = False
-                            self.bunny.current_interactable = None
-                    else:
-                        # Handle other left clicks in the game world
-                        pass
-            
+                # Handle number keys 1-6 for item selection
+                elif pygame.K_1 <= event.key <= pygame.K_6:
+                    slot_index = event.key - pygame.K_1
+                    self.bunny.select_hotbar_item(slot_index)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if self.mailbox.show_sell_menu:
+                    self.handle_mailbox_click(event.pos)
+                    
             # Handle inventory management when in full view
             if self.bunny.inventory.full_view and event.type == pygame.KEYDOWN:
                 if pygame.K_1 <= event.key <= pygame.K_6:
@@ -347,6 +312,7 @@ class Game:
                     if selected is not None:
                         if num < len(self.bunny.inventory.hotbar_indices):
                             self.bunny.inventory.hotbar_indices[num] = selected
+                            self.bunny.held_item = self.bunny.inventory[num]
                             self.bunny.inventory.swap_selected_index = None
 
                 if self.bunny.inventory.show_swap_box:
@@ -366,17 +332,36 @@ class Game:
                         self.bunny.inventory.swap_input_text += event.unicode
 
     def handle_space_press(self):
-        """Handle SPACE key press depending on context"""
         if self.bunny.mode == 'farm':
             front_x, front_y = self.bunny.get_front_position()
             if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
-                self.mailbox.interact(self)
+                self.handle_mailbox_interaction()
                 return
             self.bunny.can_interact_with(self.farm.interactables, self)
         elif self.bunny.mode == 'maze':
             self.bunny.can_interact_with(self.maze.interactables, self)
         elif self.bunny.mode == 'dungeon':
             self.bunny.throw_carrot()
+    
+    def ensure_data_files(self):
+        """Ensure all data files exist with proper headers"""
+        data_files = [
+            ('Data/maze_log.csv', ["time_taken(s)", "Success_status"]),
+            ('Data/bunny_positions.csv', ["x", "y"]),
+            ('Data/combat_accuracy.csv', ["Hit"]),
+            ('Data/inventory_usage.csv', ["item_name"]),
+            ('Data/Crop.csv', ["Week", "Season", "Crop", "Amount"])
+        ]
+        
+        for file_path, headers in data_files:
+            try:
+                os.makedirs('Data', exist_ok=True)
+                if not os.path.exists(file_path):
+                    with open(file_path, 'w', newline='') as f:
+                        writer = csv.writer(f)
+                        writer.writerow(headers)
+            except Exception as e:
+                print(f"Error creating data file {file_path}: {e}")
 
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""
@@ -421,8 +406,7 @@ class Game:
     
                 self.mailbox.add_mail(rewards)
                 self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
-                
-                
+                             
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
         if self.bunny.can_move_to(tx, ty, world):
@@ -431,6 +415,118 @@ class Game:
             self.update_camera(instant=True)
             return True
         return False
+
+    def handle_mailbox_interaction(self):
+        if not self.mailbox.show_sell_menu:
+            if self.mailbox.check_mail(self.bunny):
+                self.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
+            else:
+                self.mailbox.show_sell_menu = True
+                self.bunny.current_interactable = self.mailbox
+
+    def handle_mailbox_click(self, pos):
+        if not self.mailbox.show_sell_menu:
+            return False
+        
+        menu_width = 300
+        menu_height = 400
+        menu_x = (self.screen.get_width() - menu_width) // 2
+        menu_y = (self.screen.get_height() - menu_height) // 2
+        
+        # Create a rect for the entire menu
+        menu_rect = pygame.Rect(menu_x, menu_y, menu_width, menu_height)
+        
+        # If click is outside menu, close it
+        if not menu_rect.collidepoint(pos):
+            self.mailbox.show_sell_menu = False
+            self.bunny.current_interactable = None
+            return True
+        
+        # Check close button
+        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
+        if close_rect.collidepoint(pos):
+            self.mailbox.show_sell_menu = False
+            self.bunny.current_interactable = None
+            return True
+        
+        # Check crop selection
+        y_offset = 70
+        for crop in self.mailbox.crop_prices:
+            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
+            if rect.collidepoint(pos):
+                self.mailbox.selected_crop = crop
+                return True
+            y_offset += 50
+        
+        # Check sell button
+        if self.mailbox.selected_crop:
+            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
+            if sell_rect.collidepoint(pos):
+                self.sell_crop()
+                return True
+        
+        return False
+
+    def sell_crop(self):
+        if self.mailbox.selected_crop in self.bunny.inventory.items and self.bunny.inventory.items[self.mailbox.selected_crop] > 0:
+            quantity = self.bunny.inventory.items[self.mailbox.selected_crop]
+            total = quantity * self.mailbox.crop_prices[self.mailbox.selected_crop]
+            self.bunny.money += total
+            self.bunny.inventory.items[self.mailbox.selected_crop] = 0
+            self.bunny.inventory.show_notification(f"Sold {quantity} {self.mailbox.selected_crop} for ${total}!", (0, 255, 0))
+            
+            # Log the sale
+            self.log_sale(self.mailbox.selected_crop, quantity, total)
+        else:
+            self.bunny.inventory.show_notification(f"No {self.mailbox.selected_crop} to sell!", (255, 0, 0))
+        
+        self.mailbox.show_sell_menu = False
+        self.mailbox.selected_crop = None
+
+    def draw_mailbox_menu(self):
+        if not self.mailbox.show_sell_menu:
+            return
+        
+        menu_width = 300
+        menu_height = 400
+        menu_x = (self.screen.get_width() - menu_width) // 2
+        menu_y = (self.screen.get_height() - menu_height) // 2
+        
+        # Main menu background
+        pygame.draw.rect(self.screen, (50, 50, 50), (menu_x, menu_y, menu_width, menu_height))
+        pygame.draw.rect(self.screen, (200, 200, 200), (menu_x, menu_y, menu_width, menu_height), 2)
+        
+        font = pygame.font.Font(None, 30)
+        title = font.render("Sell Crops", True, (255, 255, 255))
+        self.screen.blit(title, (menu_x + 20, menu_y + 20))
+        
+        # Draw crop list
+        y_offset = 70
+        for crop, price in self.mailbox.crop_prices.items():
+            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
+            color = (100, 100, 100) if self.mailbox.selected_crop == crop else (70, 70, 70)
+            pygame.draw.rect(self.screen, color, rect)
+            
+            crop_text = font.render(f"{crop.capitalize()} - ${price}", True, (255, 255, 255))
+            self.screen.blit(crop_text, (rect.x + 10, rect.y + 10))
+            
+            if rect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(self.screen, (150, 150, 150), rect, 2)
+            
+            y_offset += 50
+        
+        # Draw sell button if crop selected
+        if self.mailbox.selected_crop:
+            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
+            pygame.draw.rect(self.screen, (0, 150, 0), sell_rect)
+            sell_text = font.render(f"Sell {self.mailbox.selected_crop}", True, (255, 255, 255))
+            self.screen.blit(sell_text, (sell_rect.x + 10, sell_rect.y + 10))
+        
+        # Close button
+        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
+        pygame.draw.rect(self.screen, (200, 0, 0), close_rect)
+        close_text = font.render("X", True, (255, 255, 255))
+        self.screen.blit(close_text, (close_rect.x + 10, close_rect.y + 5))
 
     def render(self):
         """Main render method"""
@@ -718,11 +814,15 @@ class Game:
         self.update_camera(instant=True)
         self.save_game()
 
-    def log_harvest(self, crop_type, amount, file='Data/Crop.csv'):
+    def log_harvest(self, crop_type, amount):
         """Log harvested crops with week and season info"""
         try:
-            with open(file, 'a', newline='') as f:
+            file_path = 'Data/Crop.csv'
+            with open(file_path, mode='a', newline='') as f:
                 writer = csv.writer(f)
+                if f.tell() == 0:  # Write header if file is empty
+                    writer.writerow(["timestamp", "week", "season", "crop_type", "amount"])
+            
                 writer.writerow([
                     self.farm.calendar.current_week,
                     self.farm.calendar.current_season,
@@ -731,12 +831,20 @@ class Game:
                 ])
         except Exception as e:
             print(f"Error logging harvest: {e}")
-      
-    def log_attack(self, success, file='Data/accuracy_log.csv'):
-        with open(file, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([pygame.time.get_ticks(), int(success)])
 
+    def log_attack(self, success):
+        """Log combat accuracy"""
+        try:
+            file_path = 'Data/combat_accuracy.csv'
+            with open(file_path, mode='a', newline='') as f:
+                writer = csv.writer(f)
+                if f.tell() == 0:  # Write header if file is empty
+                    writer.writerow(["timestamp", "success"])
+                
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                writer.writerow([int(success)])
+        except Exception as e:
+            print(f"Error logging attack: {e}")
 
 if __name__ == "__main__":
     Game().run()

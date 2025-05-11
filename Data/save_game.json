@@ -8,7 +8,11 @@
         "Time": "7:00",
         "Health": 100,
         "CropStatus": [],
-        "Inventory": {},
+        "Inventory": {
+            "carrot_weapon": 1,
+            "carrot_seed": 5,
+            "potato_seed": 5
+        },
         "Money": 0,
         "Relationship": {}
     }

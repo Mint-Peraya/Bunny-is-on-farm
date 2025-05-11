@@ -91,8 +91,9 @@ class Bunny:
         elif self.current_action == 'dig' and self.action_target.type == 'dirt':
             self.action_target.dig()
             # 🎲 Add chance to drop a seed
-            if random.random() < 0.5:  # 30% chance
-                self.add_to_inventory('seed')
+            if random.random() < 0.5:
+                x = random.choice(["carrot_seed","potato_seed","radish_seed","spinach_seed","turnip_seed"])
+                self.add_to_inventory(x)
                 self.inventory.show_notification("You got a seed!", (200, 255, 100))
 
         self.current_action = None
@@ -236,11 +237,6 @@ class Bunny:
                 self.y * Config.get('bun_size') - camera_y - 40
             ))
 
-        if self.held_item:
-            font = pygame.font.Font(None, 24)
-            text = f"Holding: {self.held_item}"
-            screen.blit(font.render(text, True, (255, 255, 255)), (10, 120))
-        
         self.draw_projectiles(screen, camera_x, camera_y)
 
     def switch_mode(self):
@@ -300,10 +296,13 @@ class Bunny:
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
+    # In the throw_carrot method in Bunny class (bunny.py)
     def throw_carrot(self):
-        if self.carrot_weapon['cooldown'] <= 0 and 'carrot_weapon' in self.inventory.items and self.inventory.items['carrot_weapon'] > 0:
+        if (self.carrot_weapon['cooldown'] <= 0 and 
+            'carrot_weapon' in self.inventory.items and 
+            self.inventory.items['carrot_weapon'] > 0 and
+            self.inventory.use_item('carrot_weapon')):  # Changed to use_item
             self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']
-            
             # Create projectile based on facing direction
             direction_map = {
                 'front': (0, 1),
@@ -394,47 +393,91 @@ class Bunny:
                 (proj['x'] * Config.get('bun_size') - camera_x,
                 proj['y'] * Config.get('bun_size') - camera_y
             ))
+    
+    # In the Bunny class, handle the key presses for item selection
+    def handle_key_press(self, event):
+        if event.key == pygame.K_1:
+            self.select_item_for_swap(0)
+        elif event.key == pygame.K_2:
+            self.select_item_for_swap(1)
+        elif event.key == pygame.K_3:
+            self.select_item_for_swap(2)
+        elif event.key == pygame.K_4:
+            self.select_item_for_swap(3)
+        elif event.key == pygame.K_5:
+            self.select_item_for_swap(4)
+        elif event.key == pygame.K_6:
+            self.select_item_for_swap(5)
+
+    def select_item_for_swap(self, index):
+        if 0 <= index < len(self.inventory):
+            self.held_item = self.inventory[index]  # Select the item
+            print(f"Item selected: {self.held_item}")  # For debugging purposes
+
+    def select_hotbar_item(self, slot_index):
+        """Select an item from the hotbar to hold"""
+        if 0 <= slot_index < len(self.inventory.hotbar_indices):
+            item_index = self.inventory.hotbar_indices[slot_index]
+            if item_index is not None:
+                items_list = list(self.inventory.items.items())
+                if item_index < len(items_list):
+                    self.held_item = items_list[item_index][0]
+                    print(f"Now holding: {self.held_item}")  # Debug output
 
 
 class Inventory:
-    def __init__(self, capacity=20):  # Increased capacity
+    def __init__(self, capacity=20):
         self.capacity = capacity
-        self.items = defaultdict(int)  # Store items and their counts
-        self.hotbar_indices = list(range(6))  # Default to first 6 items
-        self.swap_selected_index = None  # No selection initially
+        self.items = defaultdict(int)
+        # Initialize hotbar with first 6 items if they exist
+        self.hotbar_indices = [i if i < capacity else None for i in range(6)]
+        self.swap_selected_index = None
         self.swap_input_text = ""
         self.show_swap_box = False
         self.full_view = False
-        self.dragged_item = None 
+        self.dragged_item = None
+        self.notification = None
+        self.notification_time = 0
 
     def is_full(self):
-        return len(self.items) >= self.capacity
+        return sum(self.items.values()) >= self.capacity
+
+    def update_inventory_ui(self):
+        """Ensure hotbar indices are valid after inventory changes"""
+        # Create a list of available item indices
+        available_indices = list(range(len(self.items)))
+        
+        # Update hotbar indices, keeping None for empty slots
+        self.hotbar_indices = [
+            idx if idx is not None and idx < len(self.items) else None
+            for idx in self.hotbar_indices
+        ]
 
     def add_item(self, item):
-        """Add item to inventory."""
-        if hasattr(item, 'name'):  # If the item is an object with a 'name' attribute
+        """Add item to inventory - accepts either ResourceItem object or string name"""
+        if hasattr(item, 'name'):
             item_name = item.name
         else:
-            item_name = item  # Otherwise, it's just the name of the item
-
-        if len(self.items) < self.capacity:
+            item_name = item
+            item = Config.RESOURCE_ITEMS.get(item_name, None)
+        
+        if not self.is_full():
+            # If this is a new item type, add it to the inventory
+            if item_name not in self.items:
+                # Find the first empty hotbar slot if available
+                for i in range(len(self.hotbar_indices)):
+                    if self.hotbar_indices[i] is None:
+                        self.hotbar_indices[i] = len(self.items)
+                        break
+            
             self.items[item_name] = self.items.get(item_name, 0) + 1
-            self.update_inventory_ui()  # Call this method to update the UI after adding the item
             return True
-        else:
-            print("Inventory is full!")
-            return False
-
+        return False
     
-    def update_inventory_ui(self):
-        """Update the inventory bar to reflect the current inventory."""
-        self.inventory_bar.clear()  # Clear the current inventory bar
-        for i, (item_name, quantity) in enumerate(self.items.items()):
-            item = Config.RESOURCE_ITEMS.get(item_name)  # Get the item object from the Config
-            if item:
-                # Draw the item in the inventory bar
-                self.inventory_bar.add_item(item, quantity)  # Adjust according to your UI structure
-        self.inventory_bar.render()  # Render the updated inventory bar on the screen
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
 
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
@@ -579,7 +622,21 @@ class Inventory:
     def log_item_use(self, item_name):
         with open("Data/inventory_usage.csv", "a", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([pygame.time.get_ticks(), item_name])
+            writer.writerow([item_name])
+    
+    def handle_key_press(self, event):
+        if event.key == pygame.K_1:
+            self.select_item_for_swap(0)
+        elif event.key == pygame.K_2:
+            self.select_item_for_swap(1)
+        elif event.key == pygame.K_3:
+            self.select_item_for_swap(2)
+        elif event.key == pygame.K_4:
+            self.select_item_for_swap(3)
+        elif event.key == pygame.K_5:
+            self.select_item_for_swap(4)
+        elif event.key == pygame.K_6:
+            self.select_item_for_swap(5)
 
 
 class Stone:

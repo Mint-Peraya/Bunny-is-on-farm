@@ -85,14 +85,14 @@ class Config:
         "axe": ResourceItem("axe", "assets/items/axe.png"),
         "pickaxe": ResourceItem("pickaxe", "assets/items/pickaxe.png"),
         # "seed": ResourceItem("seed", "assets/items/seed.png"),
-        "carrot_seed": ResourceItem("carrot seed", "assets/plants/carrot_seed.png"),
-        "potato_seed": ResourceItem("potato seed", "assets/plants/potato_seed.png"),
-        "radish_seed": ResourceItem("radish seed", "assets/plants/radish_seed.png"),
-        "spinach_seed": ResourceItem("spinach seed", "assets/plants/spinach_seed.png"),
-        "turnip_seed": ResourceItem("turnip seed", "assets/plants/turnip_seed.png"),
-        "carrot_weapon" : ResourceItem("carrot the destroyer", "assets/items/carrot_weapon.png"),
-        "boss_key": ResourceItem("Dungeon boss key", "assets/items/boss_key.png"),
-        "diamond": ResourceItem("Dungeon boss key", "assets/items/diamond.png"),
+        "carrot_seed": ResourceItem("carrot_seed", "assets/plants/carrot_seed.png"),
+        "potato_seed": ResourceItem("potato_seed", "assets/plants/potato_seed.png"),
+        "radish_seed": ResourceItem("radish_seed", "assets/plants/radish_seed.png"),
+        "spinach_seed": ResourceItem("spinach_seed", "assets/plants/spinach_seed.png"),
+        "turnip_seed": ResourceItem("turnip_seed", "assets/plants/turnip_seed.png"),
+        "carrot_weapon" : ResourceItem("carrot_weapon", "assets/items/carrot_weapon.png"),
+        "boss_key": ResourceItem("Dungeon_boss_key", "assets/items/boss_key.png"),
+        "diamond": ResourceItem("Diamond", "assets/items/diamond.png"),
     }
 
     PLANT_CONFIG = {

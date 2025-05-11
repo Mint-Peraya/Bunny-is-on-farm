@@ -365,47 +365,36 @@ class Mailbox:
     
     @property
     def rect(self):
-        """Return collision rectangle for the mailbox"""
         return pygame.Rect(
             self.tile_x * self.size,
             self.tile_y * self.size,
-            self.size * 1.5,  # Account for larger size
+            self.size * 1.5,
             self.size * 1.5
         )
 
     def draw(self, screen, camera_x, camera_y):
-        """Draw mailbox and notification icon"""
         x = self.tile_x * self.size - camera_x
         y = self.tile_y * self.size - camera_y
         
-        # Draw larger mailbox (1.5x size)
         scaled_size = int(self.size * 1.5)
         screen.blit(pygame.transform.scale(self.image, (scaled_size, scaled_size)), 
                 (x - scaled_size//4, y - scaled_size//2))
         
-        # Draw notification if has mail
         if self.has_mail or self.notification_timer:
             noti_size = self.size // 2
             scaled_noti = pygame.transform.scale(self.noti_img, (noti_size, noti_size))
             screen.blit(scaled_noti, (x + scaled_size//2 - noti_size//2, y - noti_size))
-            
-        # Draw sell menu if open
-        if self.show_sell_menu:
-            self.draw_sell_menu(screen)
 
     def update(self):
-        """Update notification timer"""
         if self.notification_timer and pygame.time.get_ticks() - self.notification_timer > 5000:
             self.notification_timer = 0
 
     def add_mail(self, items):
-        """Add reward items to mailbox"""
         self.mail_items.extend(items)
         self.has_mail = True
         self.notification_timer = pygame.time.get_ticks()
 
     def check_mail(self, bunny):
-        """Player collects mail items"""
         if self.has_mail:
             for item, amount in self.mail_items:
                 bunny.add_to_inventory(item, amount)
@@ -413,140 +402,3 @@ class Mailbox:
             self.has_mail = False
             return True
         return False
-
-    def interact(self, game):
-        """Handle mailbox interaction"""
-        if self.has_mail:
-            if self.check_mail(game.bunny):
-                game.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
-        else:
-            self.show_sell_menu = True
-            game.bunny.current_interactable = self
-
-    def draw_sell_menu(self, screen):
-        """Draw the crop selling interface"""
-        menu_width = 300
-        menu_height = 400
-        menu_x = (screen.get_width() - menu_width) // 2
-        menu_y = (screen.get_height() - menu_height) // 2
-        
-        # Main menu background
-        pygame.draw.rect(screen, (50, 50, 50), (menu_x, menu_y, menu_width, menu_height))
-        pygame.draw.rect(screen, (200, 200, 200), (menu_x, menu_y, menu_width, menu_height), 2)
-        
-        font = pygame.font.Font(None, 30)
-        title = font.render("Sell Crops", True, (255, 255, 255))
-        screen.blit(title, (menu_x + 20, menu_y + 20))
-        
-        # Draw crop list
-        y_offset = 70
-        for crop, price in self.crop_prices.items():
-            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
-            color = (100, 100, 100) if self.selected_crop == crop else (70, 70, 70)
-            pygame.draw.rect(screen, color, rect)
-            
-            crop_text = font.render(f"{crop.capitalize()} - ${price}", True, (255, 255, 255))
-            screen.blit(crop_text, (rect.x + 10, rect.y + 10))
-            
-            if rect.collidepoint(pygame.mouse.get_pos()):
-                pygame.draw.rect(screen, (150, 150, 150), rect, 2)
-            
-            y_offset += 50
-        
-        # Draw sell button if crop selected
-        if self.selected_crop:
-            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
-            pygame.draw.rect(screen, (0, 150, 0), sell_rect)
-            sell_text = font.render(f"Sell {self.selected_crop}", True, (255, 255, 255))
-            screen.blit(sell_text, (sell_rect.x + 10, sell_rect.y + 10))
-        
-        # Close button
-        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
-        pygame.draw.rect(screen, (200, 0, 0), close_rect)
-        close_text = font.render("X", True, (255, 255, 255))
-        screen.blit(close_text, (close_rect.x + 10, close_rect.y + 5))
-
-    def handle_space_press(self):
-        """Handle SPACE key press depending on context"""
-        if self.bunny.mode == 'farm':
-            front_x, front_y = self.bunny.get_front_position()
-            if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
-                if self.mailbox.show_sell_menu:
-                    self.mailbox.show_sell_menu = False  # Close the sell menu when SPACE is pressed
-                    print("Sell menu closed.")
-                else:
-                    self.mailbox.interact(self)  # Otherwise, interact with the mailbox
-                return
-            self.bunny.can_interact_with(self.farm.interactables, self)
-
-    def handle_click(self, pos, game):
-        """Handle clicks in sell menu"""
-        if not self.show_sell_menu:
-            return False
-        
-        menu_width = 300
-        menu_height = 400
-        menu_x = (game.screen.get_width() - menu_width) // 2
-        menu_y = (game.screen.get_height() - menu_height) // 2
-        
-        # Create a rect for the entire menu
-        menu_rect = pygame.Rect(menu_x, menu_y, menu_width, menu_height)
-        
-        # If click is outside menu, close it
-        if not menu_rect.collidepoint(pos):
-            self.show_sell_menu = False
-            self.selected_crop = None
-            game.bunny.current_interactable = None
-            return True
-        
-        # Check close button
-        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
-        if close_rect.collidepoint(pos):
-            self.show_sell_menu = False
-            self.selected_crop = None
-            game.bunny.current_interactable = None
-            return True
-        
-        # Check crop selection
-        y_offset = 70
-        for crop in self.crop_prices:
-            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
-            if rect.collidepoint(pos):
-                self.selected_crop = crop
-                return True
-            y_offset += 50
-        
-        # Check sell button
-        if self.selected_crop:
-            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
-            if sell_rect.collidepoint(pos):
-                self.sell_crop(game.bunny)
-                return True
-        
-        return False
-
-    def sell_crop(self, bunny):
-        """Sell all of a specific crop"""
-        if self.selected_crop in bunny.inventory.items and bunny.inventory.items[self.selected_crop] > 0:
-            quantity = bunny.inventory.items[self.selected_crop]
-            total = quantity * self.crop_prices[self.selected_crop]
-            bunny.money += total
-            bunny.inventory.items[self.selected_crop] = 0
-            bunny.inventory.show_notification(f"Sold {quantity} {self.selected_crop} for ${total}!", (0, 255, 0))
-        else:
-            bunny.inventory.show_notification(f"No {self.selected_crop} to sell!", (255, 0, 0))
-        
-        self.show_sell_menu = False
-        self.selected_crop = None
-    # In farm.py, add to Mailbox class:
-    def draw_interaction(self, screen):
-        """Draw interaction prompt"""
-        if self.has_mail:
-            text = "Check Mail (SPACE)"
-        else:
-            text = "Open Shop (SPACE)"
-        
-        font = pygame.font.Font(Config.get('font'), 24)
-        text_surface = font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (10, 10))
-        

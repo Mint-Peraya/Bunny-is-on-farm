@@ -17,12 +17,13 @@ class Dungeon:
         self.create_rooms_and_enemies()
         self.loot_boxes = []
         self.interactables = []
+        self.portal_positions = set()  # Track portal positions to prevent overlap
 
     def is_tile_walkable(self, x, y):
         """Check if the tile at (x, y) is walkable (i.e., not a wall)."""
         if 0 <= x < self.width and 0 <= y < self.height:
-            # Check if the tile is empty (walkable)
-            return self.layout[y][x] == '.'
+            # Check if the tile is empty (walkable) and not occupied by a portal
+            return self.layout[y][x] == '.' and (x, y) not in self.portal_positions
         return False  # Out of bounds or a wall tile
     
     def is_valid_position(self, x, y):
@@ -37,7 +38,6 @@ class Dungeon:
                         return False
             return True
         return False
-
 
     def generate_dungeon_layout(self):
         """Generate a dungeon layout with rooms and corridors"""
@@ -176,6 +176,40 @@ class Dungeon:
             if self.layout[y][x] == '.':
                 self.enemies.append(Enemy(x, y, "rare"))
 
+    def add_portal(self, x, y, target_world='farm', target_pos=(1, 1)):
+        """Add a portal at the specified position if it's walkable"""
+        if self.is_tile_walkable(x, y):
+            portal = Portal(x, y, target_world, target_pos)
+            self.interactables.append(portal)
+            self.portal_positions.add((x, y))
+            return portal
+        return None
+
+    def get_random_walkable_position(self):
+        """Find a random walkable position not occupied by a portal"""
+        walkable_positions = []
+        for y in range(self.height):
+            for x in range(self.width):
+                if self.layout[y][x] == '.' and (x, y) not in self.portal_positions:
+                    walkable_positions.append((x, y))
+        
+        if walkable_positions:
+            return random.choice(walkable_positions)
+        return None
+
+    def teleport_player(self, bunny, target_world='farm'):
+        """Teleport the player to a random position in the dungeon"""
+        target_pos = self.get_random_walkable_position()
+        if target_pos:
+            # Add a return portal at the teleport location
+            self.add_portal(target_pos[0], target_pos[1], target_world, (bunny.x, bunny.y))
+            
+            # Teleport the player
+            bunny.x, bunny.y = target_pos
+            bunny.target_x, bunny.target_y = target_pos
+            return True
+        return False
+
 
 class Enemy:
     def __init__(self, x, y, enemy_type="normal"):
@@ -234,7 +268,7 @@ class Enemy:
             new_y += self.speed
         
         # Check if new position is valid
-        if self.is_valid_position(new_x, new_y, dungeon):
+        if dungeon.is_valid_position(new_x, new_y):
             self.x, self.y = new_x, new_y
         else:
             self.direction_timer = 0  # Change direction next frame
