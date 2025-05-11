@@ -34,8 +34,8 @@ class Game:
         # Store username
         self.username = username
         
-        self.bunny = Bunny(10, 10, mode='farm', username=username)  # Pass username to Bunny
-        self.dungeon = Dungeon(30, 30, self.bunny)
+        self.bunny = Bunny(15, 15, mode='farm', username=username)  # Pass username to Bunny
+        self.dungeon = Dungeon(30, 30)
         
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
@@ -53,20 +53,17 @@ class Game:
 
         self.bunny.inventory.show_notification("Received starter kit!", (0, 255, 0))
 
-
     def init_portals(self):
         # Farm portal (goes to random location)
         self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2)
         self.farm.interactables.append(self.farm_portal)
         
-        # Maze portals
-        self.maze_enterportal = Portal(1, 1, 'farm', (self.farm.width - 2, self.farm.height - 2))
+        # Only create maze exit portal (no entrance portal)
         self.exit = self.maze.get_random_exit()
-        self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))  # Make sure target_world is 'farm'
-        self.maze.interactables.append(self.maze_enterportal)
+        self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (13, 14))  # Goes back to farm at position (13,14)
         self.maze.interactables.append(self.maze_exitportal)
         
-        # Dungeon portals
+        # Dungeon portals (unchanged)
         self.dungeon_enterportal = Portal(1, 1, 'farm', (self.farm.width - 3, self.farm.height - 2))
         self.dungeon_exitportal = Portal(self.dungeon.exit_x, self.dungeon.exit_y, 'farm', (1, 1))
         self.dungeon.interactables.append(self.dungeon_enterportal)
@@ -94,8 +91,9 @@ class Game:
         self.bunny.x, self.bunny.y = 1, 1  # Maze entrance position
         self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
         self.update_camera(instant=True)
-        self.start_time = pygame.time.get_ticks()
-        print("Warped to maze!")  # Debug message
+        self.start_time = pygame.time.get_ticks()  # Reset timer when entering maze
+        self.game_over = False  # Reset game over state
+        print("Warped to maze! Timer started.")  # Debug message
 
     def is_player_exists(self):
         """Check if the player's save exists"""
@@ -137,10 +135,19 @@ class Game:
     def render_maze(self):
         """Render maze mode"""
         self.maze.draw(self.screen, self.camera_x, self.camera_y)
-        self.maze_enterportal.draw(self.screen, self.camera_x, self.camera_y)
         self.maze_exitportal.draw(self.screen, self.camera_x, self.camera_y)
 
-        # Only check for exit if not just warped
+        # Check time limit (600 seconds = 10 minutes)
+        current_time = (pygame.time.get_ticks() - self.start_time) / 1000
+        if current_time > 60:
+            print("Time limit exceeded!")
+            self.game_over = True
+            self.success = False
+            self.log_to_csv(current_time, False)
+            self.warp_to_farm()
+            return
+
+        # Check for exit if not just warped
         if not self.has_warped and int(self.bunny.x) == self.exit[0] and int(self.bunny.y) == self.exit[1]:
             print(f"Bunny reached the exit!")
             self.game_over = True
@@ -150,15 +157,16 @@ class Game:
             self.log_to_csv(time_taken, self.success)
             self.previous_exit = (self.exit[0], self.exit[1])
             self.exit = self.maze.get_random_exit()
+            self.warp_to_farm()
     
     def reset_game(self, load_save=False):
         self.farm = Farm(50, 30)
-        self.bunny = Bunny(1, 1, mode='farm', username=self.username)
+        self.bunny = Bunny(15, 15, mode='farm', username=self.username)
         self.init_portals()
         self.camera_x, self.camera_y = 0, 0
         self.game_over = False
         self.portal_cooldown = 0
-        self.dungeon = Dungeon(30, 30, self.bunny)
+        self.dungeon = Dungeon(30, 30)
     
         if load_save:
             loaded = self.load_game()
@@ -166,45 +174,45 @@ class Game:
                 self.save_game()  # Auto-save for new users
 
     def handle_interactions(self):
+        for portal in self.farm.interactables:
+            if isinstance(portal, Portal) and portal.check_collision(self.bunny):
+                if pygame.key.get_pressed()[pygame.K_SPACE]:
+                    self.handle_teleport(portal)
+                    return
+                
+        # Check mailbox interaction first
         front_x, front_y = self.bunny.get_front_position()
-
-        # Check if interacting with mailbox
         if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
-            if self.mailbox.check_mail(self.bunny):
-                self.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
-        
-        world = self.maze if self.bunny.mode == 'maze' else self.farm
-        
-        # Check mailbox interaction
-        if (front_x, front_y) == (self.mailbox.x, self.mailbox.y):
             if pygame.key.get_pressed()[pygame.K_SPACE]:
-                self.mailbox.interact(self)
-                return  # Skip other interactions
+                self.handle_mailbox_interaction()
+                return
         
+        # Handle other interactions based on bunny's mode
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
-            tile = self.farm.tiles[front_y][front_x]
-            
+            tile = self.farm.tiles[front_y][front_x]      
+            # Interactions for different types of tiles (tree, stone, dirt)
             if tile.type == 'tree':
-                self.bunny.start_action('cut', tile)
+                self.bunny.start_action('cut', tile)  # Start cutting the tree
             elif tile.type == 'stone':
-                self.bunny.start_action('mine', tile)
+                self.bunny.start_action('mine', tile)  # Start mining the stone
             elif tile.type == 'dirt':
                 if not tile.dug:
-                    self.bunny.start_action('dig', tile)
-                # In the handle_interactions method in Game class (game.py)
+                    self.bunny.start_action('dig', tile)  # Start digging if not dug
                 elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
+                    # Planting a seed if the tile is dug and the bunny has a seed
                     crop_type = self.bunny.held_item.replace("_seed", "")
-                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):  # Changed to use_item
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):  # Check if seed can be used
                         stages = []
                         for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
                             stage_img = Config.get('environ')[f'{crop_type}_stage{i}']
                             if stage_img:
                                 stages.append(stage_img)
-                        
+
                         if stages:
-                            tile.plant = Plant(crop_type, stages)
+                            tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
                 elif tile.dug and tile.plant and tile.plant.harvestable:
+                    # Harvest crop if the plant is ready
                     crop_type = tile.plant.crop_type
                     result = tile.plant.harvest()
                     if result:
@@ -216,6 +224,7 @@ class Game:
                         print("⚠️ Harvest failed — no result returned.")
 
                 elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
+                    # Water the tile if there's no seed in hand
                     tile.water()
                     self.bunny.inventory.show_notification("Watered!", (100, 200, 255))
 
@@ -253,12 +262,29 @@ class Game:
                 text = "Interact (SPACE)"
             self.draw_text(text, 24, Config.get('white'), (10, 80))
         
+        for portal in self.farm.interactables:
+            if isinstance(portal, Portal) and portal.check_collision(self.bunny):
+                text = "Enter Portal (SPACE)"
+                font = pygame.font.Font(Config.get('font'), 24)
+                text_surface = font.render(text, True, (255, 255, 255))
+                self.screen.blit(text_surface, (10, 10))
+                break
+            
         self.draw_text((f"Holding:{self.bunny.held_item}"), 25 ,Config.get('white'), (10, 80))
         self.bunny.inventory.draw(self.screen)
         moneytxt = f"Money: {self.bunny.money}"
         self.draw_text(moneytxt, 25, Config.get('white'), (10, 50))
 
         if self.bunny.mode == 'maze' and not self.game_over:
+            # Draw timer
+            current_time = (pygame.time.get_ticks() - self.start_time) / 1000
+            time_left = max(0, 600 - current_time)  # Countdown from 600 seconds
+            minutes = int(time_left // 60)
+            seconds = int(time_left % 60)
+            timer_text = f"Time left: {minutes}:{seconds:02d}"
+            self.draw_text(timer_text, 25, Config.get('white'), (10, 110))
+            
+            # Draw compass
             self.maze.draw_compass(self.screen, self.bunny, self.exit)
         
         # Draw mailbox menu if open
@@ -390,7 +416,11 @@ class Game:
 
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
                 result = "win" if success else "lose"
-                writer.writerow([timestamp, self.username, time_taken, result])
+                if result == 'win':
+                    result == True
+                elif result == 'lose':
+                    result == False
+                writer.writerow([ time_taken, result])
 
             print(f"Logged {result} for {self.username}.")
         except Exception as e:
@@ -406,9 +436,19 @@ class Game:
     
                 self.mailbox.add_mail(rewards)
                 self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
-                             
+
+    def send_seeds(self):
+        """Send seeds every Saturday"""
+        self.bunny.add_to_inventory("carrot_seed", 5)
+        self.bunny.add_to_inventory("potato_seed", 5)
+        self.bunny.add_to_inventory("radish_seed", 5)
+        self.bunny.add_to_inventory("spinach_seed", 5)
+        self.bunny.add_to_inventory("turnip_seed", 5)
+        self.bunny.inventory.show_notification("Seeds sent!", (0, 255, 0))
+        
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
+        print(f"Attempting to teleport to ({tx}, {ty})")  # Debugging line
         if self.bunny.can_move_to(tx, ty, world):
             self.bunny.x = self.bunny.target_x = tx
             self.bunny.y = self.bunny.target_y = ty
@@ -546,8 +586,12 @@ class Game:
         """Update the game state based on current mode"""
         keys = pygame.key.get_pressed()
                 # Check if 10 seconds have passed since the last log
+            # Check if it's Saturday
+        if self.farm.calendar.current_day_name == "Sat":
+            self.send_seeds()
+
         current_time = pygame.time.get_ticks()
-        if current_time - self.last_log_time >= 5000:  # 5 seconds = 5000 ms
+        if current_time - self.last_log_time >= 5000:  # 1 seconds = 5000 ms
             self.log_bunny_position()
             self.last_log_time = current_time  # Update the time of the last log
 
@@ -566,14 +610,18 @@ class Game:
         self.bunny.update_action()
         self.check_sleep_trigger()
 
-
         # Update world state
         if hasattr(world, 'update'):
             if self.bunny.mode == 'dungeon':
                 world.update(self.bunny)
             else:
                 world.update()
-
+        
+        # Update portals
+        for portal in self.farm.interactables:
+            if isinstance(portal, Portal):
+                portal.update()
+    
         # Handle interactions
         if keys[pygame.K_SPACE]:
             self.handle_interactions()
@@ -598,8 +646,12 @@ class Game:
             return  # Skip rest of update loop this frame
         
         if (self.farm.calendar.current_date and self.farm.calendar.current_year) == 1 and self.farm.calendar.current_season == 'Spring':
-            txt = 'Hi babe'
+            txt = 'Dear Little Bunny,I hope this letter finds you well and safe.'
+            txt1 = 'To help you on your journey,I send you some seeds.'
+            txtf = 'Take good care of yourself, and always remember that you are never alone.'
             BigScene(self.screen,self.clock,txt,Config.get('font'),40)
+            BigScene(self.screen,self.clock,txt1,Config.get('font'),40)
+            BigScene(self.screen,self.clock,txtf,Config.get('font'),40)
             pass
 
     def render_dungeon(self):
@@ -845,6 +897,23 @@ class Game:
                 writer.writerow([int(success)])
         except Exception as e:
             print(f"Error logging attack: {e}")
+
+    def handle_teleport(self, portal):
+        """Handle portal teleportation based on portal type"""
+        if portal.cooldown > 0:
+            return
+            
+        if portal.target_world == 'random':
+            self.warp_to_random()
+        elif portal.target_world == 'dungeon':
+            self.warp_to_dungeon()
+        elif portal.target_world == 'maze':
+            self.warp_to_maze()
+        elif portal.target_world == 'farm':
+            self.warp_to_farm()
+        
+        portal.cooldown = 10  # Set cooldown
+        self.fade_transition()
 
 if __name__ == "__main__":
     Game().run()

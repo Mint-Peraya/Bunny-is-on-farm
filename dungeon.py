@@ -5,67 +5,85 @@ from config import *
 from farm import Tile
 
 class Dungeon:
-    def __init__(self, width, height, bunny):
+    def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.bunny = bunny
-        self.exit_x = width - 2
-        self.exit_y = height - 2
-        self.layout = self.generate_dungeon_layout()
-        self.tiles = self.create_tiles()
-        self.enemies = []
-        self.create_rooms_and_enemies()
-        self.loot_boxes = []
-        self.interactables = []
-        self.portal_positions = set()  # Track portal positions to prevent overlap
+        self.layout = [['#' for _ in range(width)] for _ in range(height)]  # Dungeon filled with walls initially
+        self.exit_x = self.width - 2  # Default exit position (you can modify as needed)
+        self.exit_y = self.height - 2  # Default exit position (you can modify as needed)
+        self.portal_positions = set()  # Initialize portal positions as an empty set
+        self.enemies = []  # Enemies list
+        self.loot_boxes = []  # Loot box list
+        self.interactables = []  # List of interactables (e.g., portals, enemies, loot boxes)
 
-    def is_tile_walkable(self, x, y):
-        """Check if the tile at (x, y) is walkable (i.e., not a wall)."""
-        if 0 <= x < self.width and 0 <= y < self.height:
-            # Check if the tile is empty (walkable) and not occupied by a portal
-            return self.layout[y][x] == '.' and (x, y) not in self.portal_positions
-        return False  # Out of bounds or a wall tile
-    
-    def is_valid_position(self, x, y):
-        """Check if position is walkable (not a wall)"""
-        grid_x, grid_y = int(x), int(y)
-        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
-            # Check all adjacent tiles to prevent getting stuck
-            for dx, dy in [(0,0), (-1,0), (1,0), (0,-1), (0,1)]:
-                check_x, check_y = grid_x + dx, grid_y + dy
-                if 0 <= check_x < self.width and 0 <= check_y < self.height:
-                    if self.layout[check_y][check_x] != '.':
-                        return False
-            return True
-        return False
+    def create_room(self, layout, room):
+        """Mark room area in the dungeon layout"""
+        x, y, w, h = room
+        for i in range(y, y + h):
+            for j in range(x, x + w):
+                if 0 <= i < self.height and 0 <= j < self.width:
+                    layout[i][j] = '.'
 
-    def generate_dungeon_layout(self):
-        """Generate a dungeon layout with rooms and corridors"""
-        layout = [['#' for _ in range(self.width)] for _ in range(self.height)]
+    def create_corridor(self, layout, start, end):
+        """Create a corridor between two points"""
+        x1, y1 = start
+        x2, y2 = end
         
-        # Create main rooms
+        # Horizontal first
+        step_x = 1 if x2 > x1 else -1
+        for x in range(x1, x2 + step_x, step_x):
+            if 0 <= x < self.width:
+                layout[y1][x] = '.'
+        
+        # Then vertical
+        step_y = 1 if y2 > y1 else -1
+        for y in range(y1, y2 + step_y, step_y):
+            if 0 <= y < self.height:
+                layout[y][x2] = '.'
+
+    def generate_dungeon(self):
+        """Generate the dungeon layout with rooms and corridors"""
         main_room = (10, 5, 10, 10)  # Central room
-        room_1 = (3, 3, 6, 6)        # Top-left room
+        room_1 = (1, 1, 6, 6)        # Top-left room
         room_2 = (21, 3, 6, 6)       # Top-right room
         room_3 = (3, 15, 6, 6)       # Bottom-left room
         room_4 = (21, 15, 6, 6)      # Bottom-right room
-        
-        self.create_room(layout, main_room)
-        self.create_room(layout, room_1)
-        self.create_room(layout, room_2)
-        self.create_room(layout, room_3)
-        self.create_room(layout, room_4)
-        
-        # Create corridors connecting rooms
-        self.create_corridor(layout, (9, 5), (9, 3))    # Vertical to top
-        self.create_corridor(layout, (9, 15), (9, 20))  # Vertical to bottom
-        self.create_corridor(layout, (5, 10), (3, 10))  # Horizontal to left
-        self.create_corridor(layout, (15, 10), (21, 10)) # Horizontal to right
-        
-        # Ensure exit is accessible
-        layout[self.exit_y][self.exit_x] = '.'
-        
-        return layout
+
+        # Create rooms
+        self.create_room(self.layout, main_room)
+        self.create_room(self.layout, room_1)
+        self.create_room(self.layout, room_2)
+        self.create_room(self.layout, room_3)
+        self.create_room(self.layout, room_4)
+
+        # Calculate room centers
+        main_room_center = (main_room[0] + main_room[2] // 2, main_room[1] + main_room[3] // 2)
+        room_1_center = (room_1[0] + room_1[2] // 2, room_1[1] + room_1[3] // 2)
+        room_2_center = (room_2[0] + room_2[2] // 2, room_2[1] + room_2[3] // 2)
+        room_3_center = (room_3[0] + room_3[2] // 2, room_3[1] + room_3[3] // 2)
+        room_4_center = (room_4[0] + room_4[2] // 2, room_4[1] + room_4[3] // 2)
+
+        # Create corridors connecting the rooms
+        self.create_corridor(self.layout, main_room_center, room_1_center)
+        self.create_corridor(self.layout, main_room_center, room_2_center)
+        self.create_corridor(self.layout, main_room_center, room_3_center)
+        self.create_corridor(self.layout, main_room_center, room_4_center)
+
+        # Optionally, create more corridors to connect rooms in the dungeon
+        self.create_corridor(self.layout, room_1_center, room_2_center)
+        self.create_corridor(self.layout, room_3_center, room_4_center)
+
+        # Set exit position (adjust this as needed)
+        self.exit_x = self.width - 2
+        self.exit_y = self.height - 2
+
+        # Print out the dungeon layout for debugging
+        self.print_dungeon()
+
+    def print_dungeon(self):
+        """Helper method to print the dungeon layout"""
+        for row in self.layout:
+            print("".join(row))
 
     def create_tiles(self):
         """Create a grid of tiles with types based on dungeon layout"""
@@ -414,3 +432,4 @@ class LootBox:
                             self.rect.y - camera_y + 5,
                             self.rect.width - 10,
                             self.rect.height - 10), 2)
+            

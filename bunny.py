@@ -296,14 +296,19 @@ class Bunny:
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
-    # In the throw_carrot method in Bunny class (bunny.py)
     def throw_carrot(self):
+        # Only throw if we have carrots and cooldown is ready
         if (self.carrot_weapon['cooldown'] <= 0 and 
-            'carrot_weapon' in self.inventory.items and 
-            self.inventory.items['carrot_weapon'] > 0 and
-            self.inventory.use_item('carrot_weapon')):  # Changed to use_item
+            'carrot' in self.inventory.items and 
+            self.inventory.items['carrot'] > 0):
+            
+            # Use one carrot
+            self.inventory.items['carrot'] -= 1
+            
+            # Set cooldown
             self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']
-            # Create projectile based on facing direction
+            
+            # Create projectile
             direction_map = {
                 'front': (0, 1),
                 'back': (0, -1),
@@ -319,10 +324,16 @@ class Bunny:
                 'dy': dy * self.carrot_weapon['speed'],
                 'distance': 0
             })
+            
+            # Trigger attack animation
             self.attacking = True
             self.current_frame = 0
-
+            
+            # Log the throw (counts as a miss until it hits an enemy)
             self.log_accuracy(success=False)
+            return True  # Successfully threw a carrot
+        
+        return False  # Didn't throw
     
     def log_accuracy(self, success):
         with open("Data/combat_accuracy.csv", "a", newline="") as f:
@@ -749,6 +760,10 @@ class Portal:
 
         pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
     
+    def update(self):
+        if self.cooldown > 0:
+            self.cooldown -= 1
+            
     def teleport(self, game):
         """Handle the portal teleportation logic."""
         if self.cooldown <= 0:
@@ -758,25 +773,14 @@ class Portal:
                 game.warp_to_dungeon()
             elif self.target_world == 'farm':
                 game.warp_to_farm()
-            self.cooldown = 30  # Set cooldown only when leaving, not when returning
-    
-    def update(self):
-        if self.cooldown > 0:
-            self.cooldown -= 1
+            elif self.target_world == 'random':
+                game.warp_to_random()
+            self.cooldown = 30  # Set cooldown
 
     def interact(self, game):
-        """Handle portal interaction with random destination"""
+        """Handle portal interaction - only exit portal exists now"""
         if self.cooldown <= 0:
-            if self.target_world == 'random':
-                # 50% chance for either dungeon or maze
-                if random.random() < 0.5:
-                    game.warp_to_dungeon()
-                else:
-                    game.warp_to_maze()
-            elif self.target_world == 'dungeon':
-                game.warp_to_dungeon()
-            elif self.target_world == 'maze':
-                game.warp_to_maze()
-            
+            if self.target_world == 'farm':
+                game.warp_to_farm()
             self.cooldown = 10  # Prevent immediate re-use
 
