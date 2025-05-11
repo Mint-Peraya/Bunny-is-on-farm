@@ -54,7 +54,6 @@ class Bunny:
             'projectiles': []  # Active carrot projectiles
         }
 
-
     def start_action(self, action_type, target_tile):
         """Start an action with progress tracking"""
         self.current_action = action_type
@@ -99,7 +98,6 @@ class Bunny:
         self.current_action = None
         self.action_target = None
         self.action_progress = 0
-
 
     def load_bunny(self):
         self.sheet = Config.get("bun_sheet")
@@ -164,14 +162,23 @@ class Bunny:
         return moving
 
     def can_move_to(self, x, y, world):
+        """Check if the bunny can move to the specified (x, y) position."""
         if self.mode == 'maze':
             return (0 <= x < Config.get('grid') and 
                     0 <= y < Config.get('grid') and 
                     world.grid[y][x] == 0)
+        elif self.mode == 'dungeon':
+            # Check for walkability in the dungeon
+            return world.is_tile_walkable(int(x), int(y))
+        elif self.mode == 'farm':
+            # For farm, check the type of tile at (x, y)
+            if 0 <= x < world.width and 0 <= y < world.height:
+                tile = world.tiles[y][x]  # Get the tile at (x, y)
+                # Check if the tile is walkable (empty or dirt type)
+                return tile.type in ['empty', 'dirt']
+            return False
         else:
-            return (0 <= x < world.width and 
-                    0 <= y < world.height and 
-                    world.tiles[y][x].type not in ('tree', 'stone','house'))
+            return True  # Assume walkable for other modes
 
     def update_animation(self, moving):
         current_time = pygame.time.get_ticks()
@@ -235,7 +242,6 @@ class Bunny:
             screen.blit(font.render(text, True, (255, 255, 255)), (10, 120))
         
         self.draw_projectiles(screen, camera_x, camera_y)
-
 
     def switch_mode(self):
         self.mode = 'maze' if self.mode == 'farm' else 'farm'
@@ -324,7 +330,6 @@ class Bunny:
             writer = csv.writer(f)
             writer.writerow([int(success)])  # 1 = hit, 0 = miss
 
-
     def update_projectiles(self, enemies, dungeon):
         # Update cooldown
         if self.carrot_weapon['cooldown'] > 0:
@@ -406,12 +411,24 @@ class Inventory:
         return len(self.items) >= self.capacity
 
     def add_item(self, item):
-        """Add item to inventory"""
-        if len(self.items) < self.capacity:  # Check if space is available
-            self.items[item.name] += 1  # Ensure 'item.name' is a string
+        """Add item to inventory - accepts either ResourceItem object or string name"""
+        # If we get a ResourceItem object
+        if hasattr(item, 'name'):
+            item_name = item.name
+        # If we get a string
+        else:
+            item_name = item
+            # Convert to ResourceItem if it exists in config
+            item = Config.RESOURCE_ITEMS.get(item_name, None)
+        
+        if len(self.items) < self.capacity:
+            self.items[item_name] = self.items.get(item_name, 0) + 1
             return True
+        if item is None:
+            print(f"Warning: Tried to add unknown item '{item_name}'")
+            return False
         return False
-
+        
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
         self.notification = (font.render(text, True, color), pygame.time.get_ticks())
@@ -445,7 +462,6 @@ class Inventory:
                     font = pygame.font.SysFont(None, 22)
                     count_surface = font.render(str(count), True, (255, 255, 255))
                     screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
-
 
     def select_item_for_swap(self, index):
         """Select an item to swap into the hotbar."""
@@ -670,13 +686,16 @@ class Portal:
         pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
     
     def teleport(self, game):
+        """Handle the portal teleportation logic."""
         if self.cooldown <= 0:
             if self.target_world == 'maze':
                 game.warp_to_maze()
-            else:
+            elif self.target_world == 'dungeon':
+                game.warp_to_dungeon()
+            elif self.target_world == 'farm':
                 game.warp_to_farm()
-            self.cooldown = 30
-
+            self.cooldown = 30  # Set cooldown only when leaving, not when returning
+    
     def update(self):
         if self.cooldown > 0:
             self.cooldown -= 1

@@ -1,5 +1,5 @@
 import pygame
-import csv,json,os,sys,subprocess
+import csv,json,os,sys,subprocess,time
 from config import *
 from maze import Maze
 from bunny import *
@@ -23,6 +23,8 @@ class Game:
         self.farm = Farm(50, 30)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.mailbox = Mailbox(15, 14)  # Position near house
+        self.dungeon_portal = Portal(self.farm.width - 3, self.farm.height - 2)  # New dungeon portal
+        self.farm.interactables.append(self.dungeon_portal)
         self.farm.interactables.append(self.mailbox)
         
         # Store username
@@ -34,8 +36,55 @@ class Game:
         self.last_log_time = pygame.time.get_ticks()
         if not self.is_player_exists():
             self.handle_new_player()
+            self.give_starter_kit()
 
         self.reset_game(load_save=True)  # Modified to load save by default
+    
+    def give_starter_kit(self):
+        """Give new players essential starting items"""
+        starter_items = {
+            "carrot_seed": 5,
+            "potato_seed": 3,
+            "axe": 1,
+            "pickaxe": 1
+        }
+        
+        # Give money separately
+        self.bunny.money = 200  # Starting money
+        
+        for item_name, quantity in starter_items.items():
+            # Get the actual ResourceItem object from Config
+            item = Config.RESOURCE_ITEMS.get(item_name)
+            if item:
+                for _ in range(quantity):
+                    self.bunny.inventory.add_item(item)
+        
+        self.bunny.inventory.show_notification("Received starter kit!", (0, 255, 0))
+
+    def init_portals(self):
+        # Farm portal (goes to random location)
+        self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2)
+        self.farm.interactables.append(self.farm_portal)
+        
+        # Maze portals
+        self.maze_enterportal = Portal(1, 1, 'farm', (self.farm.width - 2, self.farm.height - 2))
+        self.exit = self.maze.get_random_exit()
+        self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))  # Make sure target_world is 'farm'
+        self.maze.interactables.append(self.maze_enterportal)
+        self.maze.interactables.append(self.maze_exitportal)
+        
+        # Dungeon portals
+        self.dungeon_enterportal = Portal(1, 1, 'farm', (self.farm.width - 3, self.farm.height - 2))
+        self.dungeon_exitportal = Portal(self.dungeon.exit_x, self.dungeon.exit_y, 'farm', (1, 1))
+        self.dungeon.interactables.append(self.dungeon_enterportal)
+        self.dungeon.interactables.append(self.dungeon_exitportal)
+
+    def warp_to_random(self):
+        """Randomly warp to either maze or dungeon"""
+        if random.random() < 0.5:
+            self.warp_to_maze()
+        else:
+            self.warp_to_dungeon()
 
     def is_player_exists(self):
         """Check if the player's save exists"""
@@ -90,13 +139,15 @@ class Game:
         self.portal_cooldown = 30  # Add cooldown to prevent immediate return
 
     def warp_to_farm(self):
+        """Warp the bunny back to the farm."""
         self.fade_transition()
         self.bunny.mode = 'farm'
-        # Use target_pos from whichever portal was used
-        source = self.maze_enterportal if self.bunny.x == self.maze_enterportal.tile_x else self.maze_exitportal
-        self.teleport_bunny(self.farm, source.target_pos)
+        self.bunny.x, self.bunny.y = 13, 14
+        self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
+        self.update_camera(instant=True)
+        self.has_warped = True
         self.game_over = False
-        self.has_warped = True  # Mark that the bunny has warped
+        self.portal_cooldown = 0  # Reset cooldown when returning to farm
 
     def render_maze(self):
         """Render maze mode"""
@@ -109,23 +160,12 @@ class Game:
             print(f"Bunny reached the exit!")
             self.game_over = True
             self.success = True
+            end_time = pygame.time.get_ticks()
+            time_taken = (end_time - self.start_time) / 1000  # Convert to seconds
+            self.log_to_csv(time_taken, self.success)
             self.previous_exit = (self.exit[0], self.exit[1])
             self.exit = self.maze.get_random_exit()
-            
-            # Log the result
-            end_time = pygame.time.get_ticks()
-            time_taken = (end_time - self.start_time) / 1000
-            self.log_to_csv(time_taken, self.success)
-        
-    def init_portals(self):
-        self.farm_portal = Portal(self.farm.width - 2, self.farm.height - 2, 'maze', (1, 1))
-        self.farm.interactables.append(self.farm_portal)
-        self.maze_enterportal = Portal(1, 1, 'farm', (self.farm.width - 2 , self.farm.height - 2))
-        self.exit = self.maze.get_random_exit()
-        self.maze_exitportal = Portal(self.exit[0], self.exit[1], 'farm', (1, 1))
-        self.maze.interactables.append(self.maze_enterportal)
-        self.maze.interactables.append(self.maze_exitportal)
-
+    
     def reset_game(self, load_save=False):
         self.farm = Farm(50, 30)
         self.bunny = Bunny(1, 1, mode='farm', username=self.username)
@@ -149,6 +189,12 @@ class Game:
                 self.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
         
         world = self.maze if self.bunny.mode == 'maze' else self.farm
+        
+        # Check mailbox interaction
+        if (front_x, front_y) == (self.mailbox.x, self.mailbox.y):
+            if pygame.key.get_pressed()[pygame.K_SPACE]:
+                self.mailbox.interact(self)
+                return  # Skip other interactions
         
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
             tile = self.farm.tiles[front_y][front_x]
@@ -202,6 +248,9 @@ class Game:
     def render_ui(self):
         """Render UI elements"""
         self.bunny.draw(self.screen, self.camera_x, self.camera_y)
+        front_x, front_y = self.bunny.get_front_position()
+        if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
+            self.mailbox.draw_interaction(self.screen)
         
         # Draw Health
         self.draw_text(f"Health: {self.bunny.health}", 35, Config.get('white'), (10, 10))
@@ -260,39 +309,78 @@ class Game:
                     self.bunny.switch_mode()
                 elif event.key == pygame.K_i:  # Toggle inventory view
                     self.bunny.inventory.toggle_inventory_view()
-                elif event.key == pygame.K_d:  # Example: switch to dungeon mode when pressing 'D'
-                    self.warp_to_dungeon()  # Call the dungeon transition method
+                elif event.key == pygame.K_SPACE:
+                    if self.mailbox.show_sell_menu:
+                        # If sell menu is open, close it on SPACE
+                        self.mailbox.show_sell_menu = False
+                        self.bunny.current_interactable = None
+                    else:
+                        self.handle_space_press()
+                elif event.key == pygame.K_ESCAPE:
+                    if self.mailbox.show_sell_menu:
+                        self.mailbox.show_sell_menu = False
+                        self.bunny.current_interactable = None
+                        continue  # Skip other handling when closing menu
+                elif event.key == pygame.K_1 and self.bunny.inventory.full_view:
+                    # Hotkey for slot 1
+                    self.bunny.inventory.hotbar_indices[0] = self.bunny.inventory.swap_selected_index
+                    self.bunny.inventory.swap_selected_index = None
+                elif event.key == pygame.K_2 and self.bunny.inventory.full_view:
+                    # Hotkey for slot 2
+                    self.bunny.inventory.hotbar_indices[1] = self.bunny.inventory.swap_selected_index
+                    self.bunny.inventory.swap_selected_index = None
+                # Add similar cases for keys 3-6 if needed
+                
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left mouse click
+                    if self.mailbox.show_sell_menu:
+                        # Handle clicks in sell menu (including clicking outside to close)
+                        if not self.mailbox.handle_click(event.pos, self):
+                            # If click wasn't handled by menu (clicked outside)
+                            self.mailbox.show_sell_menu = False
+                            self.bunny.current_interactable = None
+                    else:
+                        # Handle other left clicks in the game world
+                        pass
+            
+            # Handle inventory management when in full view
+            if self.bunny.inventory.full_view and event.type == pygame.KEYDOWN:
+                if pygame.K_1 <= event.key <= pygame.K_6:
+                    num = event.key - pygame.K_1  # hotbar slot index
+                    selected = self.bunny.inventory.swap_selected_index
+                    if selected is not None:
+                        if num < len(self.bunny.inventory.hotbar_indices):
+                            self.bunny.inventory.hotbar_indices[num] = selected
+                            self.bunny.inventory.swap_selected_index = None
 
-            # inside your scene's update or event handler
-                elif event.key == pygame.K_SPACE:  # Assuming E is your interaction key
-                    if self.bunny.mode == 'farm':
-                        self.bunny.can_interact_with(self.farm.interactables, self)
-                    elif self.bunny.mode =='maze':
-                        self.bunny.can_interact_with(self.maze.interactables, self)
+                if self.bunny.inventory.show_swap_box:
+                    if event.key == pygame.K_BACKSPACE:
+                        self.bunny.inventory.swap_input_text = self.bunny.inventory.swap_input_text[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        try:
+                            slot_index = int(self.bunny.inventory.swap_input_text) - 1
+                            if 0 <= slot_index < 6 and self.bunny.inventory.swap_selected_index is not None:
+                                self.bunny.inventory.hotbar_indices[slot_index] = self.bunny.inventory.swap_selected_index
+                        except:
+                            pass
+                        self.bunny.inventory.swap_input_text = ""
+                        self.bunny.inventory.show_swap_box = False
+                        self.bunny.inventory.swap_selected_index = None
+                    elif event.unicode.isdigit():
+                        self.bunny.inventory.swap_input_text += event.unicode
 
-                elif self.bunny.inventory.full_view:
-                        if pygame.K_1 <= event.key <= pygame.K_6:
-                            num = event.key - pygame.K_1  # hotbar slot index
-                            selected = self.bunny.inventory.swap_selected_index
-                            if selected is not None:
-                                if num < len(self.bunny.inventory.hotbar_indices):
-                                    self.bunny.inventory.hotbar_indices[num] = selected
-
-                            if self.bunny.inventory.show_swap_box:
-                                if event.key == pygame.K_BACKSPACE:
-                                    self.bunny.inventory.swap_input_text = self.bunny.inventory.swap_input_text[:-1]
-                                elif event.key == pygame.K_RETURN:
-                                    try:
-                                        slot_index = int(self.bunny.inventory.swap_input_text) - 1
-                                        if 0 <= slot_index < 6 and self.bunny.inventory.swap_selected_index is not None:
-                                            self.bunny.inventory.hotbar_indices[slot_index] = self.bunny.inventory.swap_selected_index
-                                    except:
-                                        pass
-                                    self.bunny.inventory.swap_input_text = ""
-                                    self.bunny.inventory.show_swap_box = False
-                                    self.bunny.inventory.swap_selected_index = None
-                                elif event.unicode.isdigit():
-                                    self.bunny.inventory.swap_input_text += event.unicode
+    def handle_space_press(self):
+        """Handle SPACE key press depending on context"""
+        if self.bunny.mode == 'farm':
+            front_x, front_y = self.bunny.get_front_position()
+            if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
+                self.mailbox.interact(self)
+                return
+            self.bunny.can_interact_with(self.farm.interactables, self)
+        elif self.bunny.mode == 'maze':
+            self.bunny.can_interact_with(self.maze.interactables, self)
+        elif self.bunny.mode == 'dungeon':
+            self.bunny.throw_carrot()
 
     def draw_text(self, text, font_size, color, position):
         """Helper method to draw text"""
@@ -307,22 +395,41 @@ class Game:
         self.mailbox.draw(self.screen, self.camera_x, self.camera_y)
 
     def log_to_csv(self, time_taken, success):
-        """Log game results and add rewards if successful"""
-        print(f"Logging to CSV: Time taken = {time_taken}, Success = {success}")
-        with open('Data/maze_log.csv', mode='a', newline='') as file:
-            writer = csv.writer(file)
-            writer.writerow([time_taken, success])
+        """Log game results to maze_log.csv"""
+        try:
+            # Ensure directory exists
+            os.makedirs('Data', exist_ok=True)
+            
+            # For maze completion
+            if self.bunny.mode == 'maze':
+                result = "win" if success else "lose"
+                file_path = 'Data/maze_log.csv'
                 
-        if success:
-            # Add rewards to mailbox
-            rewards = []
-            rewards.append(('diamond', 5))
-            rewards.append(('carrot', 3))
-            rewards.append(('stone', 5))
+                # Write header if file doesn't exist
+                write_header = not os.path.exists(file_path)
                 
-            self.mailbox.add_mail(rewards)
-            self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
+                with open(file_path, mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    if write_header:
+                        writer.writerow(["timestamp", "username", "time_taken", "result"])
+                    
+                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                    writer.writerow([timestamp, self.username, time_taken, result])
 
+            if success:
+                # Add rewards to mailbox
+                rewards = []
+                if self.bunny.mode == 'maze':
+                    rewards.append(('diamond', 5))
+                    rewards.append(('carrot', 3))
+                    rewards.append(('stone', 5))
+    
+                self.mailbox.add_mail(rewards)
+                self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
+                
+        except Exception as e:
+            print(f"Error logging to CSV: {e}")
+                
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
         if self.bunny.can_move_to(tx, ty, world):
@@ -577,18 +684,37 @@ class Game:
         self.end_game()
     
     def handle_bunny_faint(self):
-        """Handle the bunny fainting and transition to next day at farmhouse."""
-        faint_overlay = pygame.Surface(Config.get('window'))
-        faint_overlay.fill((0, 0, 0))
+        """Handle the bunny fainting in any game mode"""
+        # Log failure if in maze/dungeon
+        if self.bunny.mode == 'maze':
+            end_time = pygame.time.get_ticks()
+            time_taken = (end_time - self.start_time) / 1000
+            self.log_to_csv(time_taken, False)  # Log as failure
+        
+        # Create faint overlay
+        faint_overlay = pygame.Surface(Config.get('window'), pygame.SRCALPHA)
+        faint_overlay.fill((0, 0, 0, 200))  # Semi-transparent black
+        
+        # Set up text
         font = pygame.font.Font(None, 60)
-        text = font.render("You passed out and were rescued...", True, (255, 255, 255))
-        rect = text.get_rect(center=(Config.get('window')[0]//2, Config.get('window')[1]//2))
-        faint_overlay.blit(text, rect)
+        if self.bunny.mode == 'maze':
+            text = "You failed the maze and were rescued..."
+        else:
+            text = "You passed out and were rescued..."
+        
+        # Render text
+        text_surface = font.render(text, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=(Config.get('window')[0]//2, Config.get('window')[1]//2))
+        
+        # Draw everything
         self.screen.blit(faint_overlay, (0, 0))
+        self.screen.blit(text_surface, text_rect)
         pygame.display.flip()
+        
+        # Wait before continuing
         pygame.time.wait(2500)  # Wait 2.5 seconds
 
-        # Set bunny position to farm house center
+        # Reset bunny position
         self.bunny.mode = 'farm'
         self.bunny.x, self.bunny.y = 13, 14
         self.bunny.target_x, self.bunny.target_y = 13, 14
@@ -596,10 +722,9 @@ class Game:
 
         # Advance to next day
         self.farm.calendar.advance_day()
-
         self.update_camera(instant=True)
         self.save_game()
-    
+
     def log_harvest(self, crop_type,amount, file='Data/Crop.csv'):
         with open(file, 'a', newline='') as f:
             writer = csv.writer(f)

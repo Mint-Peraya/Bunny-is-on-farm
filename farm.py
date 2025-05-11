@@ -16,10 +16,8 @@ class Tile:
         self.plant = None
         self.watered = False
         self.last_watered = 0
-
-        # Visual modifiers
-        self.tree_scale = random.uniform(1.1, 1.6) if self.type == 'tree' else 1.0
-        self.stone_scale = random.uniform(0.6, 0.9) if self.type == 'stone' else 1.0
+        self.tree_scale = 1.0
+        self.stone_scale = random.uniform(0.3, 0.5) if self.type == 'stone' else 1.0
         self.image_rotation = random.choice([0, 0, 0, 5, -5]) if self.type in ('tree', 'stone') else 0
         self.image_offset_x = random.randint(-4, 4) if self.type in ('tree', 'stone') else 0
 
@@ -56,6 +54,10 @@ class Tile:
 
         if self.type == 'house':
             pygame.draw.rect(screen, (150, 75, 0), (x, y, size, size))
+        elif self.type == 'wall':
+            wall_img = env_images.get('wall')
+            if wall_img:
+                screen.blit(pygame.transform.scale(wall_img, (size, size)), (x, y))
         else:
             # Get the base image (dirt by default)
             base_image = env_images.get('dirt')
@@ -99,9 +101,17 @@ class Tile:
             screen.blit(water_overlay, (x, y))
 
 
+    # In farm.py, modify the Tile class's update method:
     def update(self):
-        if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:
+        if self.watered and pygame.time.get_ticks() - self.last_watered > 10000:  # 10 seconds
             self.watered = False
+            if self.plant and not self.plant.harvestable:  # Only affect growing plants
+                # Return seed to inventory (you'll need access to bunny)
+                seed_name = f"{self.plant.crop_type}_seed"
+                if hasattr(self, 'bunny'):  # Make sure tile has bunny reference
+                    self.bunny.add_to_inventory(seed_name)
+                self.plant = None
+                self.dug = False  # Undig the tile
  
     def harvest(self, bunny):
         if self.plant and self.plant.harvestable:
@@ -121,7 +131,10 @@ class Farm:
         self.tiles = [[Tile('dirt', x, y) for x in range(width)] for y in range(height)]
         self.interactables = []
         self.calendar = Calendar()  # Add calendar
+        # In the Tile class's __init__ method, modify these lines:
+
         self._generate_terrain()
+
 
     def update(self):
         current_time = pygame.time.get_ticks()
@@ -143,17 +156,20 @@ class Farm:
         
     def _generate_terrain(self):
         """Generate trees, stones, and other terrain features"""
-        # Add some trees
-        for _ in range(10):
+
+        # Add some trees 
+        for _ in range(40):
             x, y = random.randint(3, self.width-4), random.randint(3, self.height-4)
-            self.tiles[y][x].type = 'tree'
+            # Create a NEW Tile instance with type 'tree' - this will apply the scaling factors
+            self.tiles[y][x] = Tile('tree', x, y)
             self.tiles[y][x].health = 10
             self.tiles[y][x].max_health = 10
         
-        # Add some stones
-        for _ in range(8):
+        # Add some stones 
+        for _ in range(25): 
             x, y = random.randint(3, self.width-4), random.randint(3, self.height-4)
-            self.tiles[y][x].type = 'stone'
+            # Create a NEW Tile instance with type 'stone' - this will apply the scaling factors
+            self.tiles[y][x] = Tile('stone', x, y)
             self.tiles[y][x].health = 10
             self.tiles[y][x].max_health = 10
 
@@ -161,6 +177,15 @@ class Farm:
         for x in range(10, 16):  # 6 tiles wide
             for y in range(10, 14):  # 4 tiles tall
                 self.tiles[y][x] = Tile('house', x, y)
+
+        # Place mailbox at a clear position near house
+        mailbox_x, mailbox_y = 15, 14
+        self.tiles[mailbox_y][mailbox_x] = Tile('dirt', mailbox_x, mailbox_y)  # Ensure it's on dirt
+        self.mailbox = Mailbox(mailbox_x, mailbox_y)
+        self.interactables.append(self.mailbox)
+
+        wall_x, wall_y = 48, 28
+        self.tiles[wall_y][wall_x] = Tile('wall', wall_x, wall_y)  # Note y comes first in the indexing
 
 
     def handle_events(self, event):
@@ -186,7 +211,6 @@ class Farm:
             house_img = pygame.transform.scale(house_img, (tile_size * 10, tile_size * 8))
             screen.blit(house_img, (8 * tile_size - camera_x, 8 * tile_size - camera_y))
 
-        import random
 
     def regenerate_resources(self):
         for row in self.tiles:
@@ -201,6 +225,22 @@ class Farm:
                         tile.type = 'stone'
                         tile.health = 10
                         tile.max_health = 10
+    
+    def is_tile_walkable(self, x, y):
+        """Check if a tile can be walked on"""
+        if not (0 <= x < self.width and 0 <= y < self.height):
+            return False
+            
+        # Check tile type
+        if self.tiles[y][x].type in ('tree', 'stone', 'house', 'wall'):
+            return False
+            
+        # Check interactables
+        for obj in self.interactables:
+            if int(x) == getattr(obj, 'tile_x', -1) and int(y) == getattr(obj, 'tile_y', -1):
+                return False
+                
+        return True
 
 
 class Plant:
@@ -290,7 +330,7 @@ class Calendar:
         
     def get_date_string(self):
         # Return formatted string with the current day, date, season, week, and year
-        return f"{self.current_day_name} {self.current_date}, {self.current_season}, Week {self.current_week}, Year {self.current_year}"
+        return f"{self.current_day_name} {self.current_date}, {self.current_season}, Year {self.current_year}"
 
 
 class Mailbox:
@@ -303,26 +343,17 @@ class Mailbox:
         self.notification_timer = 0
         self.image = Config.get('environ').get('mailbox', pygame.Surface((32,32)))
         self.noti_img = pygame.image.load('assets/picture/noti.png').convert_alpha()
-
-    def draw(self, screen, camera_x, camera_y):
-        """Draw mailbox with notification if has mail"""
-        x = self.tile_x * self.size - camera_x
-        y = self.tile_y * self.size - camera_y
         
-        # Draw mailbox
-        screen.blit(pygame.transform.scale(self.image, (self.size, self.size)), (x, y))
-        
-        # Draw notification if has mail
-        if self.has_mail or self.notification_timer:
-            # Scale notification image to appropriate size
-            noti_size = self.size // 2
-            scaled_noti = pygame.transform.scale(self.noti_img, (noti_size, noti_size))
-            screen.blit(scaled_noti, (x + self.size - noti_size, y - noti_size//2))
-            
-            if self.notification_timer:
-                font = pygame.font.Font(None, 24)
-                text = font.render("New rewards!", True, (255, 255, 255))
-                screen.blit(text, (x, y - 30))
+        # Selling properties
+        self.show_sell_menu = False
+        self.selected_crop = None
+        self.crop_prices = {
+            "carrot": 15,
+            "potato": 20,
+            "radish": 25,
+            "spinach": 30,
+            "turnip": 35
+        }
 
     @property
     def x(self):
@@ -331,6 +362,41 @@ class Mailbox:
     @property
     def y(self):
         return self.tile_y
+    
+    @property
+    def rect(self):
+        """Return collision rectangle for the mailbox"""
+        return pygame.Rect(
+            self.tile_x * self.size,
+            self.tile_y * self.size,
+            self.size * 1.5,  # Account for larger size
+            self.size * 1.5
+        )
+
+    def draw(self, screen, camera_x, camera_y):
+        """Draw mailbox and notification icon"""
+        x = self.tile_x * self.size - camera_x
+        y = self.tile_y * self.size - camera_y
+        
+        # Draw larger mailbox (1.5x size)
+        scaled_size = int(self.size * 1.5)
+        screen.blit(pygame.transform.scale(self.image, (scaled_size, scaled_size)), 
+                (x - scaled_size//4, y - scaled_size//2))
+        
+        # Draw notification if has mail
+        if self.has_mail or self.notification_timer:
+            noti_size = self.size // 2
+            scaled_noti = pygame.transform.scale(self.noti_img, (noti_size, noti_size))
+            screen.blit(scaled_noti, (x + scaled_size//2 - noti_size//2, y - noti_size))
+            
+        # Draw sell menu if open
+        if self.show_sell_menu:
+            self.draw_sell_menu(screen)
+
+    def update(self):
+        """Update notification timer"""
+        if self.notification_timer and pygame.time.get_ticks() - self.notification_timer > 5000:
+            self.notification_timer = 0
 
     def add_mail(self, items):
         """Add reward items to mailbox"""
@@ -348,7 +414,126 @@ class Mailbox:
             return True
         return False
 
-    def update(self):
-        """Update notification timer"""
-        if self.notification_timer and pygame.time.get_ticks() - self.notification_timer > 5000:
-            self.notification_timer = 0
+    def interact(self, game):
+        """Handle mailbox interaction"""
+        if self.has_mail:
+            if self.check_mail(game.bunny):
+                game.bunny.inventory.show_notification("Collected rewards!", (0, 255, 0))
+        else:
+            self.show_sell_menu = True
+            game.bunny.current_interactable = self
+
+    def draw_sell_menu(self, screen):
+        """Draw the crop selling interface"""
+        menu_width = 300
+        menu_height = 400
+        menu_x = (screen.get_width() - menu_width) // 2
+        menu_y = (screen.get_height() - menu_height) // 2
+        
+        # Main menu background
+        pygame.draw.rect(screen, (50, 50, 50), (menu_x, menu_y, menu_width, menu_height))
+        pygame.draw.rect(screen, (200, 200, 200), (menu_x, menu_y, menu_width, menu_height), 2)
+        
+        font = pygame.font.Font(None, 30)
+        title = font.render("Sell Crops", True, (255, 255, 255))
+        screen.blit(title, (menu_x + 20, menu_y + 20))
+        
+        # Draw crop list
+        y_offset = 70
+        for crop, price in self.crop_prices.items():
+            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
+            color = (100, 100, 100) if self.selected_crop == crop else (70, 70, 70)
+            pygame.draw.rect(screen, color, rect)
+            
+            crop_text = font.render(f"{crop.capitalize()} - ${price}", True, (255, 255, 255))
+            screen.blit(crop_text, (rect.x + 10, rect.y + 10))
+            
+            if rect.collidepoint(pygame.mouse.get_pos()):
+                pygame.draw.rect(screen, (150, 150, 150), rect, 2)
+            
+            y_offset += 50
+        
+        # Draw sell button if crop selected
+        if self.selected_crop:
+            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
+            pygame.draw.rect(screen, (0, 150, 0), sell_rect)
+            sell_text = font.render(f"Sell {self.selected_crop}", True, (255, 255, 255))
+            screen.blit(sell_text, (sell_rect.x + 10, sell_rect.y + 10))
+        
+        # Close button
+        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
+        pygame.draw.rect(screen, (200, 0, 0), close_rect)
+        close_text = font.render("X", True, (255, 255, 255))
+        screen.blit(close_text, (close_rect.x + 10, close_rect.y + 5))
+
+    def handle_click(self, pos, game):
+        """Handle clicks in sell menu"""
+        if not self.show_sell_menu:
+            return False
+        
+        menu_width = 300
+        menu_height = 400
+        menu_x = (game.screen.get_width() - menu_width) // 2
+        menu_y = (game.screen.get_height() - menu_height) // 2
+        
+        # Create a rect for the entire menu
+        menu_rect = pygame.Rect(menu_x, menu_y, menu_width, menu_height)
+        
+        # If click is outside menu, close it
+        if not menu_rect.collidepoint(pos):
+            self.show_sell_menu = False
+            self.selected_crop = None
+            game.bunny.current_interactable = None
+            return True
+        
+        # Check close button
+        close_rect = pygame.Rect(menu_x + menu_width - 40, menu_y + 10, 30, 30)
+        if close_rect.collidepoint(pos):
+            self.show_sell_menu = False
+            self.selected_crop = None
+            game.bunny.current_interactable = None  # Clear interaction
+            return True
+        
+        # Check crop selection
+        y_offset = 70
+        for crop in self.crop_prices:
+            rect = pygame.Rect(menu_x + 20, menu_y + y_offset, menu_width - 40, 40)
+            if rect.collidepoint(pos):
+                self.selected_crop = crop
+                return True
+            y_offset += 50
+        
+        # Check sell button
+        if self.selected_crop:
+            sell_rect = pygame.Rect(menu_x + 20, menu_y + menu_height - 60, menu_width - 40, 40)
+            if sell_rect.collidepoint(pos):
+                self.sell_crop(game.bunny)
+                return True
+        
+        return False
+
+    def sell_crop(self, bunny):
+        """Sell all of a specific crop"""
+        if self.selected_crop in bunny.inventory.items and bunny.inventory.items[self.selected_crop] > 0:
+            quantity = bunny.inventory.items[self.selected_crop]
+            total = quantity * self.crop_prices[self.selected_crop]
+            bunny.money += total
+            bunny.inventory.items[self.selected_crop] = 0
+            bunny.inventory.show_notification(f"Sold {quantity} {self.selected_crop} for ${total}!", (0, 255, 0))
+        else:
+            bunny.inventory.show_notification(f"No {self.selected_crop} to sell!", (255, 0, 0))
+        
+        self.show_sell_menu = False
+        self.selected_crop = None
+    # In farm.py, add to Mailbox class:
+    def draw_interaction(self, screen):
+        """Draw interaction prompt"""
+        if self.has_mail:
+            text = "Check Mail (SPACE)"
+        else:
+            text = "Open Shop (SPACE)"
+        
+        font = pygame.font.Font(Config.get('font'), 24)
+        text_surface = font.render(text, True, (255, 255, 255))
+        screen.blit(text_surface, (10, 10))
+        
