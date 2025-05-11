@@ -86,14 +86,6 @@ class Dungeon:
         self.exit_x = self.width - 2
         self.exit_y = self.height - 2
 
-        # Print out the dungeon layout for debugging
-        self.print_dungeon()
-
-    def print_dungeon(self):
-        """Helper method to print the dungeon layout"""
-        for row in self.layout:
-            print("".join(row))
-
     def create_tiles(self):
         """Create a grid of tiles with types based on dungeon layout"""
         tiles = []
@@ -113,20 +105,20 @@ class Dungeon:
             enemy.update(bunny, self)
             if enemy.health <= 0:
                 if not enemy.has_dropped_loot:
-                    self.handle_enemy_death(enemy)
+                    self.handle_enemy_death(enemy, bunny)  # Pass bunny reference
                 self.enemies.remove(enemy)
                 
         for loot_box in self.loot_boxes:
             loot_box.update(bunny)
 
-    def handle_enemy_death(self, enemy):
+    def handle_enemy_death(self, enemy, bunny):
         """Handle loot dropping when enemy dies"""
         enemy.has_dropped_loot = True
         if isinstance(enemy, Boss):
-            self.loot_boxes.append(LootBox(enemy.x, enemy.y, "boss", self.bunny))
+            self.loot_boxes.append(LootBox(enemy.x, enemy.y, "boss", bunny))
         else:
             loot_type = "health_potion" if random.random() > 0.5 else "coins"
-            self.loot_boxes.append(LootBox(enemy.x, enemy.y, loot_type, self.bunny))
+            self.loot_boxes.append(LootBox(enemy.x, enemy.y, loot_type, bunny))
 
     def render(self, screen, camera_x, camera_y):
         """Render the dungeon with optimized drawing"""
@@ -157,31 +149,6 @@ class Dungeon:
         for obj in self.interactables:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
-
-    def create_room(self, layout, room):
-        """Mark room area in the dungeon layout"""
-        x, y, w, h = room
-        for i in range(y, y + h):
-            for j in range(x, x + w):
-                if 0 <= i < self.height and 0 <= j < self.width:
-                    layout[i][j] = '.'
-
-    def create_corridor(self, layout, start, end):
-        """Create a corridor between two points"""
-        x1, y1 = start
-        x2, y2 = end
-        
-        # Horizontal first
-        step_x = 1 if x2 > x1 else -1
-        for x in range(x1, x2 + step_x, step_x):
-            if 0 <= x < self.width:
-                layout[y1][x] = '.'
-        
-        # Then vertical
-        step_y = 1 if y2 > y1 else -1
-        for y in range(y1, y2 + step_y, step_y):
-            if 0 <= y < self.height:
-                layout[y][x2] = '.'
 
     def create_rooms_and_enemies(self):
         """Place enemies in rooms"""
@@ -216,10 +183,8 @@ class Dungeon:
         """Check if the tile at (x, y) is walkable."""
         if 0 <= x < self.width and 0 <= y < self.height:
             tile = self.layout[y][x]  # Get the tile at (x, y)
-            # Consider walkable tiles to be '.' (empty tiles) in your layout
             return tile == '.'
         return False
-
 
     def get_random_walkable_position(self):
         """Find a random walkable position not occupied by a portal"""
@@ -303,7 +268,6 @@ class Enemy:
         elif self.direction == "down":
             new_y += self.speed
         
-        # Changed from is_valid_position to is_tile_walkable
         if dungeon.is_tile_walkable(int(new_x), int(new_y)):
             self.x, self.y = new_x, new_y
         else:
@@ -431,4 +395,3 @@ class LootBox:
                             self.rect.y - camera_y + 5,
                             self.rect.width - 10,
                             self.rect.height - 10), 2)
-            

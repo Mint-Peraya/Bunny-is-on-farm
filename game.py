@@ -642,6 +642,12 @@ class Game:
         self.render_ui()
         pygame.display.flip()
 
+    def check_collision(self, proj, enemy):
+        """Check if a projectile collides with an enemy."""
+        proj_rect = pygame.Rect(proj['x'] * Config.get('bun_size'), proj['y'] * Config.get('bun_size'),
+                                Config.get('bun_size') // 2, Config.get('bun_size') // 2)
+        return proj_rect.colliderect(enemy.rect)
+    
     def update(self):
         """Update the game state based on current mode"""
         keys = pygame.key.get_pressed()
@@ -691,8 +697,15 @@ class Game:
         
         # Update projectiles
         if self.bunny.mode == 'dungeon':
-            self.bunny.update_projectiles(self.dungeon.enemies, self.dungeon)
-
+            for proj in self.bunny.carrot_weapon['projectiles'][:]:
+                proj.update()
+                # Check for collisions with enemies
+                for enemy in self.dungeon.enemies[:]:
+                    if self.check_collision(proj, enemy):
+                        enemy.take_damage(proj.damage)
+                        if proj in self.bunny.projectiles:
+                            self.bunny.projectiles.remove(proj)
+                        break
         # Update camera
         self.update_camera()
 

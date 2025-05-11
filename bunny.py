@@ -268,12 +268,9 @@ class Bunny:
     def can_interact_with(self, objects, world):
         for obj in objects:
             if self.is_near(obj):
-                # Check if object has interact method before calling it
-                if hasattr(obj, 'interact') and callable(obj.interact):
-                    obj.interact(world)
-                    self.last_interacted = obj
-                    return True
-        return False
+                obj.interact(world)
+                self.last_interacted = obj
+                break
 
     def is_near(self, obj):
         dx = self.x - obj.x
@@ -299,16 +296,15 @@ class Bunny:
             else:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
+    # In the throw_carrot method in Bunny class (bunny.py)
     def throw_carrot(self):
-        # Only throw if we have carrots and cooldown is ready
         if (self.carrot_weapon['cooldown'] <= 0 and 
-            'carrot' in self.inventory.items and 
-            self.inventory.items['carrot_weapon'] > 0):
-            
-            # Set cooldown
+            'carrot_weapon' in self.inventory.items and 
+            self.inventory.items['carrot_weapon'] > 0 and
+            self.inventory.use_item('carrot_weapon')):  # Changed to use_item
             self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']
-            
-            # Create projectile
+
+            # Create projectile based on facing direction
             direction_map = {
                 'front': (0, 1),
                 'back': (0, -1),
@@ -324,16 +320,10 @@ class Bunny:
                 'dy': dy * self.carrot_weapon['speed'],
                 'distance': 0
             })
-            
-            # Trigger attack animation
             self.attacking = True
             self.current_frame = 0
-            
-            # Log the throw (counts as a miss until it hits an enemy)
+
             self.log_accuracy(success=False)
-            return True  # Successfully threw a carrot
-        
-        return False  # Didn't throw
     
     def log_accuracy(self, success):
         with open("Data/combat_accuracy.csv", "a", newline="") as f:
@@ -397,14 +387,11 @@ class Bunny:
                 self.carrot_weapon['projectiles'].remove(proj)
 
     def draw_projectiles(self, screen, camera_x, camera_y):
-        carrot_img = Config.get('items')['carrot']
-        for proj in self.carrot_weapon['projectiles']:
-            screen.blit(
-                carrot_img,
-                (proj['x'] * Config.get('bun_size') - camera_x,
-                proj['y'] * Config.get('bun_size') - camera_y
-            ))
+        carrot_img = pygame.image.load('assets/items/carrot_weapon.png').convert_alpha()
+        for proj in self.carrot_weapon['projectiles'][:]:
+            screen.blit(carrot_img, (proj['x'] * Config.get('bun_size') - camera_x, proj['y'] * Config.get('bun_size') - camera_y))
     
+    # In the Bunny class, handle the key presses for item selection
     def handle_key_press(self, event):
         if event.key == pygame.K_1:
             self.select_item_for_swap(0)
@@ -484,6 +471,11 @@ class Inventory:
             return True
         return False
     
+    def show_notification(self, text, color):
+        font = pygame.font.SysFont(None, 30)
+        self.notification = (font.render(text, True, color), pygame.time.get_ticks())
+        self.notification_time = pygame.time.get_ticks()
+
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
         self.notification = (font.render(text, True, color), pygame.time.get_ticks())
@@ -754,10 +746,6 @@ class Portal:
 
         pygame.draw.circle(screen, Config.get('dark_purple'), (center_x, center_y), int(base_radius))
     
-    def update(self):
-        if self.cooldown > 0:
-            self.cooldown -= 1
-            
     def teleport(self, game):
         """Handle the portal teleportation logic."""
         if self.cooldown <= 0:
@@ -767,14 +755,25 @@ class Portal:
                 game.warp_to_dungeon()
             elif self.target_world == 'farm':
                 game.warp_to_farm()
-            elif self.target_world == 'random':
-                game.warp_to_random()
-            self.cooldown = 30  # Set cooldown
+            self.cooldown = 30  # Set cooldown only when leaving, not when returning
+    
+    def update(self):
+        if self.cooldown > 0:
+            self.cooldown -= 1
 
     def interact(self, game):
-        """Handle portal interaction - only exit portal exists now"""
+        """Handle portal interaction with random destination"""
         if self.cooldown <= 0:
-            if self.target_world == 'farm':
-                game.warp_to_farm()
+            if self.target_world == 'random':
+                # 50% chance for either dungeon or maze
+                if random.random() < 0.5:
+                    game.warp_to_dungeon()
+                else:
+                    game.warp_to_maze()
+            elif self.target_world == 'dungeon':
+                game.warp_to_dungeon()
+            elif self.target_world == 'maze':
+                game.warp_to_maze()
+            
             self.cooldown = 10  # Prevent immediate re-use
 
