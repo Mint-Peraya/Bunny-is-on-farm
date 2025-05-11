@@ -9,7 +9,10 @@ A pixel-art styled farming and maze adventure game where you play as a bunny. Ch
 from
     https://github.com/Mint-Peraya/Bunny-is-on-farm.git
 
+or download zip file and extract it to be folder.
+
 2. Run the game at ```play.py```
+run in IDE or command prompt/Terminal
 
 🐍 Requirements
 Python 3.9 or higher
