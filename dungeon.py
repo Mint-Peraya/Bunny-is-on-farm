@@ -257,6 +257,28 @@ class Enemy:
             self.shield_active = True
             self.shield_health = 50
 
+    def render(self, screen, camera_x, camera_y):
+        """Draw the enemy with image or fallback to colored rectangle"""
+        pos_x = self.x * Config.get('bun_size') - camera_x
+        pos_y = self.y * Config.get('bun_size') - camera_y
+        
+        if self.image:
+            screen.blit(self.image, (pos_x, pos_y))
+        else:
+            # Fallback rendering
+            pygame.draw.rect(screen, self.color,
+                           (pos_x, pos_y,
+                            self.size, self.size))
+        
+        # Health bar (keep existing)
+        health_width = self.size * (self.health / self.max_health)
+        pygame.draw.rect(screen, (255, 0, 0),
+                        (pos_x, pos_y - 10,
+                         self.size, 5))
+        pygame.draw.rect(screen, (0, 255, 0),
+                        (pos_x, pos_y - 10,
+                         health_width, 5))
+        
     def take_damage(self, amount, bunny):
         """Handle taking damage and check if the enemy dies."""
         self.health -= amount

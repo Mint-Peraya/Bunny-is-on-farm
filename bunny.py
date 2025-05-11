@@ -436,45 +436,80 @@ class Bunny:
 class Inventory:
     def __init__(self, capacity=20):
         self.capacity = capacity
-        self.items = defaultdict(int)  # Now stores item names (strings) as keys
-        self.hotbar_indices = [None] * 6
-        self.swap_selected_index = None
-        self.swap_input_text = ""
-        self.show_swap_box = False
-        self.full_view = False
-        self.dragged_item = None
+        self.items = defaultdict(int)
+        self.hotbar = [None] * 6  # Stores item names directly
+        self.selected_slot = 0
         self.notification = None
         self.notification_time = 0
 
     def add_item(self, item_name, amount=1):
-        """Add item to inventory using item name (string)"""
-        if isinstance(item_name, ResourceItem):  # Handle if a ResourceItem is passed
-            item_name = item_name.name
-        
+        """Add item to inventory and auto-assign to first empty hotbar slot"""
         if sum(self.items.values()) + amount <= self.capacity:
-            self.items[item_name] = self.items.get(item_name, 0) + amount
-            # Update hotbar if needed
-            if item_name not in self.items or self.items[item_name] == amount:
-                for i in range(len(self.hotbar_indices)):
-                    if self.hotbar_indices[i] is None:
-                        self.hotbar_indices[i] = list(self.items.keys()).index(item_name)
+            self.items[item_name] += amount
+            
+            # Auto-assign to first empty hotbar slot if not already present
+            if item_name not in self.hotbar:
+                for i in range(len(self.hotbar)):
+                    if self.hotbar[i] is None:
+                        self.hotbar[i] = item_name
                         break
             return True
         return False
 
     def use_item(self, item_name, amount=1):
-        """Use an item from inventory and update hotbar if needed"""
+        """Use an item from inventory and clear hotbar slot if depleted"""
         if self.items.get(item_name, 0) >= amount:
             self.items[item_name] -= amount
             if self.items[item_name] <= 0:
                 del self.items[item_name]
                 # Remove from hotbar if present
-                item_list = list(self.items.keys())
-                for i in range(len(self.hotbar_indices)):
-                    if self.hotbar_indices[i] is not None and self.hotbar_indices[i] >= len(item_list):
-                        self.hotbar_indices[i] = None
+                if item_name in self.hotbar:
+                    index = self.hotbar.index(item_name)
+                    self.hotbar[index] = None
             return True
         return False
+
+    def draw_quick_bar(self, screen):
+        """Draw only the 6 slots of the hotbar with selection highlight"""
+        slot_size = 64
+        padding = 5
+        start_x = (screen.get_width() - (slot_size + padding) * 6) // 2
+        y = screen.get_height() - slot_size - 10
+
+        for i in range(6):
+            # Draw slot background
+            color = (200, 200, 200) if i != self.selected_slot else (255, 255, 0)
+            rect = pygame.Rect(start_x + i * (slot_size + padding), y, slot_size, slot_size)
+            pygame.draw.rect(screen, (50, 50, 50), rect)  # Dark background
+            pygame.draw.rect(screen, color, rect, 2)  # Border
+
+            # Draw item if present
+            item_name = self.hotbar[i]
+            if item_name and item_name in self.items and self.items[item_name] > 0:
+                if item_name in Config.RESOURCE_ITEMS:
+                    item = Config.RESOURCE_ITEMS[item_name]
+                    img = pygame.transform.scale(item.image, (slot_size - 10, slot_size - 10))
+                    screen.blit(img, (rect.x + 5, rect.y + 5))
+                    
+                    # Draw item count
+                    font = pygame.font.SysFont(None, 22)
+                    count_surface = font.render(str(self.items[item_name]), True, (255, 255, 255))
+                    screen.blit(count_surface, (rect.right - 18, rect.bottom - 22))
+
+        # Draw notification if present
+        if self.notification and pygame.time.get_ticks() - self.notification_time < 3000:
+            text_surface, _ = self.notification
+            text_rect = text_surface.get_rect(center=(screen.get_width()//2, y - 20))
+            screen.blit(text_surface, text_rect)
+
+    def select_hotbar_slot(self, slot_index):
+        """Select a hotbar slot (0-5)"""
+        if 0 <= slot_index < 6:
+            self.selected_slot = slot_index
+            item_name = self.hotbar[slot_index]
+            if item_name and item_name in self.items:
+                return item_name
+        return None
 
     def is_full(self):
         return sum(self.items.values()) >= self.capacity
