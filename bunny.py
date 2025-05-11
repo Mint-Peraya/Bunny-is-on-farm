@@ -297,30 +297,28 @@ class Bunny:
                 self.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
 
     def throw_carrot(self):
-        """Throw carrots continuously without cooldown."""
-        if 'carrot_weapon' in self.inventory.items and self.inventory.items['carrot_weapon'] > 0:
-            # Create a new projectile based on the current direction
-            direction_map = {
-                'front': (0, 1),
-                'back': (0, -1),
-                'left': (-1, 0),
-                'right': (1, 0)
-            }
-            dx, dy = direction_map.get(self.current_direction, (0, 1))  # Default to 'front'
+        """Throw carrots continuously without consuming them"""
+        # Create a new projectile based on the current direction
+        direction_map = {
+            'front': (0, 1),
+            'back': (0, -1),
+            'left': (-1, 0),
+            'right': (1, 0)
+        }
+        dx, dy = direction_map.get(self.current_direction, (0, 1))  # Default to 'front'
 
-            # Add the new projectile to the projectiles list
-            self.carrot_weapon['projectiles'].append({
-                'x': self.x,
-                'y': self.y,
-                'dx': dx * self.carrot_weapon['speed'],
-                'dy': dy * self.carrot_weapon['speed'],
-                'distance': 0  # Initial distance is 0
-            })
+        # Add the new projectile to the projectiles list
+        self.carrot_weapon['projectiles'].append({
+            'x': self.x,
+            'y': self.y,
+            'dx': dx * self.carrot_weapon['speed'],
+            'dy': dy * self.carrot_weapon['speed'],
+            'distance': 0  # Initial distance is 0
+        })
 
-            self.attacking = True  # Set attacking state to true
-            self.current_frame = 0  # Reset the animation frame for attacking
-            self.inventory.use_item('carrot_weapon')  # Use the carrot weapon from the inventory
-
+        self.attacking = True  # Set attacking state to true
+        self.current_frame = 0  # Reset the animation frame for attacking
+        
     def log_accuracy(self, success):
         with open("Data/combat_accuracy.csv", "a", newline="") as f:
             writer = csv.writer(f)
@@ -373,7 +371,6 @@ class Bunny:
             pygame.draw.circle(screen, (255, 165, 0), 
                             (proj['x'] * Config.get('bun_size') - camera_x, 
                                 proj['y'] * Config.get('bun_size') - camera_y), 5)
-
 
     def handle_key_press(self, event):
         if event.key == pygame.K_1:

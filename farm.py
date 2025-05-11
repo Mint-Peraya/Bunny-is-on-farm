@@ -41,13 +41,16 @@ class Tile:
         self._y = value  # Set the value of y
 
 
-    def harvest(self,bunny):
+    def harvest(self, bunny):
         if self.plant and self.plant.harvestable:
-            self.plant.harvest(bunny)
-            self.plant = None  # Remove plant after harvesting
-            return True
+            result = self.plant.harvest()
+            if result:
+                item, amount = result
+                bunny.add_to_inventory(item, amount)
+                self.plant = None
+                return True
         return False
-
+    
     def water(self):
         self.watered = True
         self.last_watered = pygame.time.get_ticks()
@@ -268,14 +271,11 @@ class Plant:
         self.planted_time = pygame.time.get_ticks()
         self.harvestable = False
 
-    def harvest(self, bunny):
-        """Harvest the plant."""
+    def harvest(self):
         if self.harvestable:
-            # Add harvested item to bunny's inventory
-            bunny.inventory.add_item(self.crop_type)
-            print(f"{self.crop_type} harvested!")
-            return True
-        return False
+            self.harvestable = False
+            return (self.config["harvest_item"], self.config["harvest_amount"])
+        return None
 
     def update(self, current_season):
         now = pygame.time.get_ticks()

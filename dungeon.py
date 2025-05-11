@@ -162,7 +162,6 @@ class Dungeon:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
 
-
     def create_rooms_and_enemies(self):
         """Place enemies in rooms"""
         # Boss in center

@@ -433,13 +433,13 @@ class Game:
     def ensure_data_files(self):
         """Ensure all data files exist with proper headers"""
         data_files = [
-            ('Data/maze_log.csv', ["time_taken(s)", "Success_status"]),
-            ('Data/bunny_positions.csv', ["x", "y"]),
-            ('Data/combat_accuracy.csv', ["Hit"]),
-            ('Data/inventory_usage.csv', ["item_name"]),
-            ('Data/Crop.csv', ["Week", "Season", "Crop", "Amount"])
-        ]
-        
+    ('Data/maze_log.csv', ["time_taken(s)", "Success_status"]),
+    ('Data/bunny_positions.csv', ["x", "y"]),
+    ('Data/combat_accuracy.csv', ["Hit"]),
+    ('Data/inventory_usage.csv', ["item_name"]),
+    ('Data/Crop.csv', ["Week", "Season", "Crop", "Amount"]),
+    ('Data/enemy_difficulty.csv', ["Enemy Type", "Kills/Deaths"])  # New entry for enemy difficulty
+]
         for file_path, headers in data_files:
             try:
                 os.makedirs('Data', exist_ok=True)
