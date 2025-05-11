@@ -403,7 +403,8 @@ class Mailbox:
         """Handle mailbox interaction"""
         if not self.show_sell_menu:
             if self.has_mail:
-                self.check_mail(game.bunny)
+                if self.check_mail(game.bunny):
+                    game.bunny.inventory.show_notification("Mail collected!", (0, 255, 0))
             else:
                 self.show_sell_menu = True
                 game.bunny.current_interactable = self

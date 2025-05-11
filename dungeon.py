@@ -24,7 +24,7 @@ class Dungeon:
         # Add portals
         self.add_portal(1, 1, 'farm', (1, 1))  # Entrance portal
         self.add_portal(self.exit_x, self.exit_y, 'farm', (13, 14))  # Exit portal
-        
+
     def create_room(self, layout, room):
         """Mark room area in the dungeon layout"""
         x, y, w, h = room
@@ -130,8 +130,8 @@ class Dungeon:
 
     def render(self, screen, camera_x, camera_y):
         """Render the dungeon with optimized drawing"""
-        wall_color = (0, 0, 0)  # Black walls
-        floor_color = (50, 50, 50)  # Dark gray floors
+        wall_color = (100, 100, 100)  # Dark gray walls
+        floor_color = (200, 200, 200)  # Light gray floors
         tile_size = Config.get('bun_size')
         
         for y in range(self.height):

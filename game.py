@@ -82,21 +82,20 @@ class Game:
         self.fade_transition()
         self.bunny.mode = 'dungeon'
         
-        # Ensure dungeon is properly initialized
+        # Reinitialize dungeon to ensure it's properly generated
         self.dungeon = Dungeon(30, 30)
         
-        # Set position to a known walkable spot (like near the entrance portal)
+        # Set position to a known walkable spot (near entrance portal)
         self.bunny.x, self.bunny.y = 1, 1
         self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
         
-        # Debug output
-        print(f"Teleported to dungeon at ({self.bunny.x}, {self.bunny.y})")
-        print("Dungeon layout at spawn point:")
-        for row in self.dungeon.layout[:5]:  # Print first 5 rows
-            print("".join(row[:10]))  # Print first 10 columns
-        
+        # Force camera update
         self.update_camera(instant=True)
         self.dungeon_start_time = pygame.time.get_ticks()
+        
+        # Debug output
+        print(f"Dungeon spawned at ({self.bunny.x}, {self.bunny.y})")
+        print(f"Camera position: ({self.camera_x}, {self.camera_y})")
 
     def warp_to_maze(self):
         self.fade_transition()
@@ -187,25 +186,22 @@ class Game:
                 self.save_game()  # Auto-save for new users
 
     def handle_interactions(self):
-        # First check portal interaction
-        for obj in self.farm.interactables:
-            if isinstance(obj, Portal):
-                # Get bunny's position in tile coordinates
-                bunny_tile_x, bunny_tile_y = int(self.bunny.x), int(self.bunny.y)
-                
-                # Check if bunny is standing on the portal
-                if bunny_tile_x == obj.x and bunny_tile_y == obj.y:
-                    if pygame.key.get_pressed()[pygame.K_SPACE]:
-                        self.handle_teleport(obj)
-                        return
-        
-        # Then check mailbox interaction
+        # First check mailbox interaction
         front_x, front_y = self.bunny.get_front_position()
         if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
             if pygame.key.get_pressed()[pygame.K_SPACE]:
                 self.mailbox.interact(self)
                 return
         
+        # Then check portal interaction
+        for obj in self.farm.interactables:
+            if isinstance(obj, Portal):
+                bunny_tile_x, bunny_tile_y = int(self.bunny.x), int(self.bunny.y)
+                if bunny_tile_x == obj.x and bunny_tile_y == obj.y:
+                    if pygame.key.get_pressed()[pygame.K_SPACE]:
+                        self.handle_teleport(obj)
+                        return
+
         # Handle other interactions based on bunny's mode
         if self.bunny.mode == 'farm' and 0 <= front_x < self.farm.width and 0 <= front_y < self.farm.height:
             tile = self.farm.tiles[front_y][front_x]      
@@ -325,8 +321,8 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_r:
-                    self.reset_game()
+                if event.key == pygame.K_d:
+                    self.warp_to_dungeon()
                 elif event.key == pygame.K_m:
                     self.bunny.switch_mode()
                 elif event.key == pygame.K_i:
