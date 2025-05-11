@@ -113,15 +113,11 @@ class Tile:
                 self.plant = None
                 self.dug = False  # Undig the tile
  
-    def harvest(self, bunny):
-        if self.plant and self.plant.harvestable:
-            result = self.plant.harvest()
-            if result:
-                item, amount = result
-                bunny.add_to_inventory(item, amount)
-                self.plant = None
-                return True
-        return False
+    def harvest(self):
+        if self.harvestable:
+            self.harvestable = False
+            return (self.config["harvest_item"], self.config["harvest_amount"])
+        return None
 
 
 class Farm:

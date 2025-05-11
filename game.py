@@ -81,11 +81,22 @@ class Game:
     def warp_to_dungeon(self):
         self.fade_transition()
         self.bunny.mode = 'dungeon'
-        self.bunny.x, self.bunny.y = 1, 1  # Dungeon entrance position
+        
+        # Ensure dungeon is properly initialized
+        self.dungeon = Dungeon(30, 30)
+        
+        # Set position to a known walkable spot (like near the entrance portal)
+        self.bunny.x, self.bunny.y = 1, 1
         self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
+        
+        # Debug output
+        print(f"Teleported to dungeon at ({self.bunny.x}, {self.bunny.y})")
+        print("Dungeon layout at spawn point:")
+        for row in self.dungeon.layout[:5]:  # Print first 5 rows
+            print("".join(row[:10]))  # Print first 10 columns
+        
         self.update_camera(instant=True)
         self.dungeon_start_time = pygame.time.get_ticks()
-        print("Warped to dungeon!")  # Debug message
 
     def warp_to_maze(self):
         self.fade_transition()
@@ -141,7 +152,7 @@ class Game:
 
         # Check time limit (600 seconds = 10 minutes)
         current_time = (pygame.time.get_ticks() - self.start_time) / 1000
-        if current_time > 60:
+        if current_time > 600:
             print("Time limit exceeded!")
             self.game_over = True
             self.success = False
@@ -159,7 +170,7 @@ class Game:
             self.log_to_csv(time_taken, self.success)
             self.previous_exit = (self.exit[0], self.exit[1])
             self.exit = self.maze.get_random_exit()
-            self.warp_to_farm()
+            self.handle_bunny_faint()
     
     def reset_game(self, load_save=False):
         self.farm = Farm(50, 30)
@@ -178,10 +189,15 @@ class Game:
     def handle_interactions(self):
         # First check portal interaction
         for obj in self.farm.interactables:
-            if isinstance(obj, Portal) and obj.check_collision(self.bunny):
-                if pygame.key.get_pressed()[pygame.K_SPACE]:
-                    self.handle_teleport(obj)
-                    return
+            if isinstance(obj, Portal):
+                # Get bunny's position in tile coordinates
+                bunny_tile_x, bunny_tile_y = int(self.bunny.x), int(self.bunny.y)
+                
+                # Check if bunny is standing on the portal
+                if bunny_tile_x == obj.x and bunny_tile_y == obj.y:
+                    if pygame.key.get_pressed()[pygame.K_SPACE]:
+                        self.handle_teleport(obj)
+                        return
         
         # Then check mailbox interaction
         front_x, front_y = self.bunny.get_front_position()
@@ -215,16 +231,16 @@ class Game:
                             tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
                 elif tile.dug and tile.plant and tile.plant.harvestable:
-                    # Harvest crop if the plant is ready
-                    crop_type = tile.plant.crop_type
-                    result = tile.plant.harvest()
-                    if result:
-                        item, amount = result
-                        self.bunny.add_to_inventory(item, amount)
-                        tile.plant = None
-                        self.log_harvest(crop_type, amount)
-                    else:
-                        print("⚠️ Harvest failed — no result returned.")
+                        # Harvest crop if the plant is ready
+                        result = tile.harvest(self.bunny)
+                        if result:
+                            item, amount = result
+                            self.bunny.add_to_inventory(item, amount)
+                            self.bunny.inventory.show_notification(f"Harvested {amount} {item}!", (0, 255, 0))
+                            tile.plant = None
+                            self.log_harvest(tile.plant.crop_type, amount)
+                        else:
+                            print("Harvest failed")
 
                 elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
                     # Water the tile if there's no seed in hand
@@ -321,6 +337,8 @@ class Game:
                         self.bunny.current_interactable = None
                     else:
                         self.handle_space_press()
+                elif event.key == pygame.K_p:  # Add dedicated portal key
+                    self.handle_portal_interaction()
                 elif event.key == pygame.K_ESCAPE:
                     if self.mailbox.show_sell_menu:
                         self.mailbox.show_sell_menu = False
@@ -961,5 +979,15 @@ class Game:
         portal.cooldown = 10  # Set cooldown
         self.fade_transition()
 
+    def harvest(self, bunny):
+        if self.plant and self.plant.harvestable:
+            result = self.plant.harvest()
+            if result:
+                item, amount = result
+                bunny.add_to_inventory(item, amount)
+                self.plant = None
+                return True
+        return False
+    
 if __name__ == "__main__":
     Game().run()

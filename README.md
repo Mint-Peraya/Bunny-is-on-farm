@@ -21,6 +21,7 @@ pip install -r requirements.txt
 
 - **Arrow Keys**: Move character
 - **SPACE**: Interact/Use tool
+- **P**: Interact with portal
 - **E**: Open inventory
 - **I**: Toggle full inventory view
 - **R**: Reset game

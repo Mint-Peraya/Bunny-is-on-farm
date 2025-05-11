@@ -3,19 +3,28 @@ import math, csv
 import random
 from config import *
 from farm import Tile
+from bunny import *
 
 class Dungeon:
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.layout = [['#' for _ in range(width)] for _ in range(height)]  # Dungeon filled with walls initially
-        self.exit_x = self.width - 2  # Default exit position (you can modify as needed)
-        self.exit_y = self.height - 2  # Default exit position (you can modify as needed)
-        self.portal_positions = set()  # Initialize portal positions as an empty set
-        self.enemies = []  # Enemies list
-        self.loot_boxes = []  # Loot box list
-        self.interactables = []  # List of interactables (e.g., portals, enemies, loot boxes)
-
+        self.layout = [['#' for _ in range(width)] for _ in range(height)]
+        self.exit_x = self.width - 2
+        self.exit_y = self.height - 2
+        self.portal_positions = set()
+        self.enemies = []
+        self.loot_boxes = []
+        self.interactables = []
+        
+        # Generate dungeon content immediately
+        self.generate_dungeon()
+        self.create_rooms_and_enemies()
+        
+        # Add portals
+        self.add_portal(1, 1, 'farm', (1, 1))  # Entrance portal
+        self.add_portal(self.exit_x, self.exit_y, 'farm', (13, 14))  # Exit portal
+        
     def create_room(self, layout, room):
         """Mark room area in the dungeon layout"""
         x, y, w, h = room
@@ -44,7 +53,7 @@ class Dungeon:
     def generate_dungeon(self):
         """Generate the dungeon layout with rooms and corridors"""
         main_room = (10, 5, 10, 10)  # Central room
-        room_1 = (1, 1, 6, 6)        # Top-left room
+        room_1 = (0, 0, 6, 6)        # Top-left room
         room_2 = (21, 3, 6, 6)       # Top-right room
         room_3 = (3, 15, 6, 6)       # Bottom-left room
         room_4 = (21, 15, 6, 6)      # Bottom-right room
@@ -202,6 +211,15 @@ class Dungeon:
             self.portal_positions.add((x, y))
             return portal
         return None
+    
+    def is_tile_walkable(self, x, y):
+        """Check if the tile at (x, y) is walkable."""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            tile = self.layout[y][x]  # Get the tile at (x, y)
+            # Consider walkable tiles to be '.' (empty tiles) in your layout
+            return tile == '.'
+        return False
+
 
     def get_random_walkable_position(self):
         """Find a random walkable position not occupied by a portal"""
