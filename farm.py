@@ -41,17 +41,12 @@ class Tile:
         self._y = value  # Set the value of y
 
 
-    def harvest(self, bunny):
-        """Handle the harvesting of the tile."""
-        if self.type == 'dirt' and self.plant and self.plant.harvestable:
-            # Perform harvesting logic
+    def harvest(self,bunny):
+        if self.plant and self.plant.harvestable:
             self.plant.harvest(bunny)
-            bunny.inventory.show_notification(f"Harvested {self.plant.name}!", (200, 200, 0))
-            self.plant = None  # Remove the plant after harvesting
+            self.plant = None  # Remove plant after harvesting
             return True
-        else:
-            bunny.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
-            return False
+        return False
 
     def water(self):
         self.watered = True

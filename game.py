@@ -226,17 +226,18 @@ class Game:
                         if stages:
                             tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
                             self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
-                elif tile.dug and tile.plant and tile.plant.harvestable:
-                        # Harvest crop if the plant is ready
-                        result = tile.harvest()
-                        if result:
-                            item, amount = result
-                            self.bunny.add_to_inventory(item, amount)
-                            self.bunny.inventory.show_notification(f"Harvested {amount} {item}!", (0, 255, 0))
-                            tile.plant = None
-                            self.log_harvest(tile.plant.crop_type, amount)
-                        else:
-                            print("Harvest failed")
+                elif tile.dug and tile.plant is None and self.bunny.held_item and self.bunny.held_item.endswith("_seed"):
+                    crop_type = self.bunny.held_item.replace("_seed", "")
+                    if crop_type in Config.PLANT_CONFIG and self.bunny.inventory.use_item(self.bunny.held_item):
+                        stages = []
+                        for i in range(1, Config.PLANT_CONFIG[crop_type]["stages"] + 1):
+                            stage_img = Config.get('environ').get(f'{crop_type}_stage{i}')
+                            if stage_img:
+                                stages.append(stage_img)
+
+                        if stages:
+                            tile.plant = Plant(crop_type, stages)  # Plant the seed in the tile
+                            self.bunny.inventory.show_notification(f"Planted {crop_type}!", (0, 255, 0))
 
                 elif tile.dug and (not self.bunny.held_item or not self.bunny.held_item.endswith("_seed")):
                     # Water the tile if there's no seed in hand
