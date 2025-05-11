@@ -7,10 +7,13 @@ from farm import *
 from dungeon import Dungeon 
 from stattk import *
 import tkinter as tk
-
+from collections import defaultdict
 
 class Game:
     def __init__(self, username='Unknown'):
+        # Ensure the 'Data' directory exists
+        os.makedirs('Data', exist_ok=True)
+
         self.start_time = None
         self.previous_exit = None
         self.has_warped = False
@@ -23,8 +26,8 @@ class Game:
         self.farm = Farm(50, 30)
         self.maze = Maze(Config.get('grid'), Config.get('grid'))
         self.mailbox = Mailbox(15, 14)  # Position near house
-        self.dungeon_portal = Portal(self.farm.width - 3, self.farm.height - 2)  # New dungeon portal
-        self.farm.interactables.append(self.dungeon_portal)
+        self.warp_portal = Portal(self.farm.width - 3, self.farm.height - 2, 'random')
+        self.farm.interactables.append(self.warp_portal)
         self.farm.interactables.append(self.mailbox)
         
         # Store username
@@ -46,20 +49,22 @@ class Game:
             "carrot_seed": 5,
             "potato_seed": 3,
             "axe": 1,
-            "pickaxe": 1
+            "carrot_weapon": 1
         }
-        
+
         # Give money separately
         self.bunny.money = 200  # Starting money
-        
+
         for item_name, quantity in starter_items.items():
             # Get the actual ResourceItem object from Config
             item = Config.RESOURCE_ITEMS.get(item_name)
             if item:
                 for _ in range(quantity):
                     self.bunny.inventory.add_item(item)
-        
+                    print(f"Added {item_name} to inventory")  # Debug statement to verify addition
+
         self.bunny.inventory.show_notification("Received starter kit!", (0, 255, 0))
+
 
     def init_portals(self):
         # Farm portal (goes to random location)
@@ -86,6 +91,24 @@ class Game:
         else:
             self.warp_to_dungeon()
 
+    def warp_to_dungeon(self):
+        self.fade_transition()
+        self.bunny.mode = 'dungeon'
+        self.bunny.x, self.bunny.y = 1, 1  # Dungeon entrance position
+        self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
+        self.update_camera(instant=True)
+        self.dungeon_start_time = pygame.time.get_ticks()
+        print("Warped to dungeon!")  # Debug message
+
+    def warp_to_maze(self):
+        self.fade_transition()
+        self.bunny.mode = 'maze'
+        self.bunny.x, self.bunny.y = 1, 1  # Maze entrance position
+        self.bunny.target_x, self.bunny.target_y = self.bunny.x, self.bunny.y
+        self.update_camera(instant=True)
+        self.start_time = pygame.time.get_ticks()
+        print("Warped to maze!")  # Debug message
+
     def is_player_exists(self):
         """Check if the player's save exists"""
         try:
@@ -103,40 +126,13 @@ class Game:
         txt1 = "Welcome, little one. I know I am not part of the family you once had, but the forest has brought you to me, and now you will rest here, where the shadows of the trees cannot reach you. "
         txt2 = "This tiny space has been a refuge for many, and it will be yours for a time. But I must leave."
         txt3 = " I have places to go. Dear bunny, you will be left in peace. I hope this new life brings you peace, though I won't be here to see your journey. "
-        txt4 = "The world called me elsewhere. But until then, enjoy the quiet of this space, for it will be your home, at least for now." 
         txt5 = "Goodbye, little one. Good luck!"
 
         BigScene(self.screen,self.clock,txt1,Config.get('font'),40).run()
         BigScene(self.screen,self.clock,txt2,Config.get('font'),40).run()
         BigScene(self.screen,self.clock,txt3,Config.get('font'),40).run()
-        BigScene(self.screen,self.clock,txt4,Config.get('font'),40).run()
         BigScene(self.screen,self.clock,txt5,Config.get('font'),40).run()
         self.save_game()    
-
-    def warp_to_dungeon(self):
-        """Transition to dungeon mode"""
-        self.fade_transition()
-        self.bunny.mode = 'dungeon'
-        self.dungeon_start_time = pygame.time.get_ticks()  # Start timer for dungeon mode
-        self.has_warped = True
-        self.game_over = False
-        self.portal_cooldown = 30  # Add cooldown to prevent immediate return
-        self.update_camera(instant=True)
-
-    def warp_to_maze(self):
-        self.fade_transition()
-        self.bunny.mode = 'maze'
-        # Warp bunny to maze at the enter portal position
-        self.bunny.x = self.maze_enterportal.tile_x
-        self.bunny.y = self.maze_enterportal.tile_y
-        self.bunny.target_x = self.bunny.x
-        self.bunny.target_y = self.bunny.y
-        self.game_over = False
-        self.start_time = pygame.time.get_ticks()
-        self.previous_exit = None
-        self.has_warped = True
-        self.update_camera(instant=True)
-        self.portal_cooldown = 30  # Add cooldown to prevent immediate return
 
     def warp_to_farm(self):
         """Warp the bunny back to the farm."""
@@ -397,22 +393,21 @@ class Game:
     def log_to_csv(self, time_taken, success):
         """Log game results to maze_log.csv"""
         try:
-            # Ensure directory exists
             os.makedirs('Data', exist_ok=True)
-            
             file_path = 'Data/maze_log.csv'
-            
-            # Write header if file doesn't exist
+
             write_header = not os.path.exists(file_path)
-            
+
             with open(file_path, mode='a', newline='') as file:
                 writer = csv.writer(file)
                 if write_header:
                     writer.writerow(["timestamp", "username", "time_taken", "result"])
-                
+
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
                 result = "win" if success else "lose"
                 writer.writerow([timestamp, self.username, time_taken, result])
+
+            print(f"Logged {result} for {self.username}.")
         except Exception as e:
             print(f"Error logging maze data: {e}")
 
@@ -536,8 +531,8 @@ class Game:
         # Show sleep screen
         sleep_overlay = pygame.Surface(Config.get('window'))
         sleep_overlay.fill((0, 0, 0))
-        font = pygame.font.Font(None, 100)
-        text = font.render("Sleeping...", True, (255, 255, 255))
+        font = pygame.font.Font(Config.get('font'), 40)
+        text = font.render("Home is the best place to sleep", True, (255, 255, 255))
         rect = text.get_rect(center=(Config.get('window')[0]//2, Config.get('window')[1]//2))
         sleep_overlay.blit(text, rect)
         self.screen.blit(sleep_overlay, (0, 0))

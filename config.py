@@ -11,7 +11,7 @@ class Frame:
         image = pygame.transform.scale(image, (width * scale, height * scale))
         image.set_colorkey(colour)
         return image
-    
+
 # Initialize pygame before loading images
 pygame.init()
 pygame.display.set_mode((1, 1))
@@ -68,7 +68,6 @@ class Config:
         'mailbox': pygame.image.load('assets/picture/mailbox.png').convert_alpha(),
         "noti":pygame.image.load('assets/picture/noti.png').convert_alpha(),
         "wall": pygame.image.load('assets/picture/wall.png').convert_alpha(),
-        "floor":pygame.image.load('assets/picture/floor.png').convert_alpha(),
     },
         'items': {
     'carrot': pygame.image.load('assets/items/carrot.png').convert_alpha(),

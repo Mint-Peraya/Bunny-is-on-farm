@@ -2,20 +2,43 @@
 
 A pixel-art styled farming and maze adventure game where you play as a bunny. Chop trees, mine rocks, collect resources, and teleport between dimensions via magic portals!
 
----
 
 ## 📦 Installation Instructions
 
-1. Clone the repository from github at version v0.5 or v1.0
+1. Clone the repository from github at version v1.0
+from
     https://github.com/Mint-Peraya/Bunny-is-on-farm.git
 
 2. Run the game at ```play.py```
 
 🐍 Requirements
-Python 3.8 or higher
+Python 3.9 or higher
+with everything from requirements.txt
 
-🎮 Controls
-Key	Action
-Arrow Keys	Move the bunny
-SPACE	Interact
-i Open full inventory
+pip install -r requirements.txt
+
+## Controls 🎮
+
+- **Arrow Keys**: Move character
+- **SPACE**: Interact/Use tool
+- **E**: Open inventory
+- **I**: Toggle full inventory view
+- **R**: Reset game
+- **ESC**: Close menus
+
+## Data Collection
+
+The game records:
+- Player movement patterns
+- Crop harvest statistics
+- Combat accuracy
+- Maze completion times
+
+Data is saved in the `Data/` directory.
+
+## Troubleshooting
+
+If you encounter issues:
+1. Verify all requirements are installed
+2. Ensure the `Data/` directory exists and is writable
+3. Check for error messages in the console

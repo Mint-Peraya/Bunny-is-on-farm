@@ -466,6 +466,19 @@ class Mailbox:
         close_text = font.render("X", True, (255, 255, 255))
         screen.blit(close_text, (close_rect.x + 10, close_rect.y + 5))
 
+    def handle_space_press(self):
+        """Handle SPACE key press depending on context"""
+        if self.bunny.mode == 'farm':
+            front_x, front_y = self.bunny.get_front_position()
+            if (int(front_x), int(front_y)) == (self.mailbox.x, self.mailbox.y):
+                if self.mailbox.show_sell_menu:
+                    self.mailbox.show_sell_menu = False  # Close the sell menu when SPACE is pressed
+                    print("Sell menu closed.")
+                else:
+                    self.mailbox.interact(self)  # Otherwise, interact with the mailbox
+                return
+            self.bunny.can_interact_with(self.farm.interactables, self)
+
     def handle_click(self, pos, game):
         """Handle clicks in sell menu"""
         if not self.show_sell_menu:

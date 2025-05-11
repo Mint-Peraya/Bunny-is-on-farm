@@ -411,24 +411,31 @@ class Inventory:
         return len(self.items) >= self.capacity
 
     def add_item(self, item):
-        """Add item to inventory - accepts either ResourceItem object or string name"""
-        # If we get a ResourceItem object
-        if hasattr(item, 'name'):
+        """Add item to inventory."""
+        if hasattr(item, 'name'):  # If the item is an object with a 'name' attribute
             item_name = item.name
-        # If we get a string
         else:
-            item_name = item
-            # Convert to ResourceItem if it exists in config
-            item = Config.RESOURCE_ITEMS.get(item_name, None)
-        
+            item_name = item  # Otherwise, it's just the name of the item
+
         if len(self.items) < self.capacity:
             self.items[item_name] = self.items.get(item_name, 0) + 1
+            self.update_inventory_ui()  # Call this method to update the UI after adding the item
             return True
-        if item is None:
-            print(f"Warning: Tried to add unknown item '{item_name}'")
+        else:
+            print("Inventory is full!")
             return False
-        return False
-        
+
+    
+    def update_inventory_ui(self):
+        """Update the inventory bar to reflect the current inventory."""
+        self.inventory_bar.clear()  # Clear the current inventory bar
+        for i, (item_name, quantity) in enumerate(self.items.items()):
+            item = Config.RESOURCE_ITEMS.get(item_name)  # Get the item object from the Config
+            if item:
+                # Draw the item in the inventory bar
+                self.inventory_bar.add_item(item, quantity)  # Adjust according to your UI structure
+        self.inventory_bar.render()  # Render the updated inventory bar on the screen
+
     def show_notification(self, text, color):
         font = pygame.font.SysFont(None, 30)
         self.notification = (font.render(text, True, color), pygame.time.get_ticks())
@@ -632,14 +639,14 @@ class Tree:
 
 
 class Portal:
-    def __init__(self, tile_x, tile_y, target_world='maze', target_pos=(1, 1)):
+    def __init__(self, tile_x, tile_y, target_world='random', target_pos=(1, 1)):
         self.tile_x = tile_x
         self.tile_y = tile_y
-        self.target_world = target_world
+        self.target_world = target_world  # Can be 'random', 'dungeon', or 'maze'
         self.target_pos = target_pos
         self.size = Config.get('bun_size')
         self.interact_text = "Enter portal (SPACE)"
-        self.cooldown = 0  # Added cooldown timer
+        self.cooldown = 0
 
     @property
     def x(self):
@@ -701,5 +708,18 @@ class Portal:
             self.cooldown -= 1
 
     def interact(self, game):
-        self.teleport(game)
+        """Handle portal interaction with random destination"""
+        if self.cooldown <= 0:
+            if self.target_world == 'random':
+                # 50% chance for either dungeon or maze
+                if random.random() < 0.5:
+                    game.warp_to_dungeon()
+                else:
+                    game.warp_to_maze()
+            elif self.target_world == 'dungeon':
+                game.warp_to_dungeon()
+            elif self.target_world == 'maze':
+                game.warp_to_maze()
+            
+            self.cooldown = 10  # Prevent immediate re-use
 
