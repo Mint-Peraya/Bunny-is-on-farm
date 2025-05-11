@@ -303,10 +303,7 @@ class Bunny:
         # Only throw if we have carrots and cooldown is ready
         if (self.carrot_weapon['cooldown'] <= 0 and 
             'carrot' in self.inventory.items and 
-            self.inventory.items['carrot'] > 0):
-            
-            # Use one carrot
-            self.inventory.items['carrot'] -= 1
+            self.inventory.items['carrot_weapon'] > 0):
             
             # Set cooldown
             self.carrot_weapon['cooldown'] = self.carrot_weapon['max_cooldown']

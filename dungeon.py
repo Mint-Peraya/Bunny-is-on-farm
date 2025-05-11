@@ -303,8 +303,8 @@ class Enemy:
         elif self.direction == "down":
             new_y += self.speed
         
-        # Check if new position is valid
-        if dungeon.is_valid_position(new_x, new_y):
+        # Changed from is_valid_position to is_tile_walkable
+        if dungeon.is_tile_walkable(int(new_x), int(new_y)):
             self.x, self.y = new_x, new_y
         else:
             self.direction_timer = 0  # Change direction next frame
@@ -316,25 +316,6 @@ class Enemy:
         # Check for attack
         if self.rect.colliderect(bunny.rect):
             bunny.take_damage(self.attack_power)
-
-    def is_valid_position(self, x, y, dungeon):
-        """Check if position is valid (not a wall)"""
-        # Check all four corners of enemy's hitbox
-        size = self.size / Config.get('bun_size')
-        corners = [
-            (x, y),
-            (x + size, y),
-            (x, y + size),
-            (x + size, y + size)
-        ]
-        
-        for cx, cy in corners:
-            grid_x, grid_y = int(cx), int(cy)
-            if not (0 <= grid_x < dungeon.width and 0 <= grid_y < dungeon.height):
-                return False
-            if dungeon.layout[grid_y][grid_x] != '.':
-                return False
-        return True
 
     def take_damage(self, amount):
         """Handle taking damage"""
