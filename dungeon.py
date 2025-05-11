@@ -24,6 +24,19 @@ class Dungeon:
             # Check if the tile is empty (walkable)
             return self.layout[y][x] == '.'
         return False  # Out of bounds or a wall tile
+    
+    def is_valid_position(self, x, y):
+        """Check if position is walkable (not a wall)"""
+        grid_x, grid_y = int(x), int(y)
+        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
+            # Check all adjacent tiles to prevent getting stuck
+            for dx, dy in [(0,0), (-1,0), (1,0), (0,-1), (0,1)]:
+                check_x, check_y = grid_x + dx, grid_y + dy
+                if 0 <= check_x < self.width and 0 <= check_y < self.height:
+                    if self.layout[check_y][check_x] != '.':
+                        return False
+            return True
+        return False
 
 
     def generate_dungeon_layout(self):
@@ -117,13 +130,6 @@ class Dungeon:
         for obj in self.interactables:
             if hasattr(obj, 'draw'):
                 obj.draw(screen, camera_x, camera_y)
-
-    def is_valid_position(self, x, y):
-        """Check if position is walkable (not a wall)"""
-        grid_x, grid_y = int(x), int(y)
-        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
-            return self.layout[grid_y][grid_x] == '.'
-        return False
 
     def create_room(self, layout, room):
         """Mark room area in the dungeon layout"""

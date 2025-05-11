@@ -491,7 +491,7 @@ class Mailbox:
         if close_rect.collidepoint(pos):
             self.show_sell_menu = False
             self.selected_crop = None
-            game.bunny.current_interactable = None  # Clear interaction
+            game.bunny.current_interactable = None
             return True
         
         # Check crop selection

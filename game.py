@@ -400,21 +400,21 @@ class Game:
             # Ensure directory exists
             os.makedirs('Data', exist_ok=True)
             
-            # For maze completion
-            if self.bunny.mode == 'maze':
+            file_path = 'Data/maze_log.csv'
+            
+            # Write header if file doesn't exist
+            write_header = not os.path.exists(file_path)
+            
+            with open(file_path, mode='a', newline='') as file:
+                writer = csv.writer(file)
+                if write_header:
+                    writer.writerow(["timestamp", "username", "time_taken", "result"])
+                
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
                 result = "win" if success else "lose"
-                file_path = 'Data/maze_log.csv'
-                
-                # Write header if file doesn't exist
-                write_header = not os.path.exists(file_path)
-                
-                with open(file_path, mode='a', newline='') as file:
-                    writer = csv.writer(file)
-                    if write_header:
-                        writer.writerow(["timestamp", "username", "time_taken", "result"])
-                    
-                    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                    writer.writerow([timestamp, self.username, time_taken, result])
+                writer.writerow([timestamp, self.username, time_taken, result])
+        except Exception as e:
+            print(f"Error logging maze data: {e}")
 
             if success:
                 # Add rewards to mailbox
@@ -427,8 +427,6 @@ class Game:
                 self.mailbox.add_mail(rewards)
                 self.bunny.inventory.show_notification("Rewards waiting at mailbox!", (200, 200, 0))
                 
-        except Exception as e:
-            print(f"Error logging to CSV: {e}")
                 
     def teleport_bunny(self, world, target_pos):
         tx, ty = target_pos
@@ -725,10 +723,19 @@ class Game:
         self.update_camera(instant=True)
         self.save_game()
 
-    def log_harvest(self, crop_type,amount, file='Data/Crop.csv'):
-        with open(file, 'a', newline='') as f:
-            writer = csv.writer(f)
-            writer.writerow([self.farm.calendar.current_week, crop_type, amount])
+    def log_harvest(self, crop_type, amount, file='Data/Crop.csv'):
+        """Log harvested crops with week and season info"""
+        try:
+            with open(file, 'a', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    self.farm.calendar.current_week,
+                    self.farm.calendar.current_season,
+                    crop_type, 
+                    amount
+                ])
+        except Exception as e:
+            print(f"Error logging harvest: {e}")
       
     def log_attack(self, success, file='Data/accuracy_log.csv'):
         with open(file, 'a', newline='') as f:
