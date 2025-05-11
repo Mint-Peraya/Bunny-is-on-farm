@@ -20,14 +20,37 @@ class Tile:
         self.stone_scale = random.uniform(0.3, 0.5) if self.type == 'stone' else 1.0
         self.image_rotation = random.choice([0, 0, 0, 5, -5]) if self.type in ('tree', 'stone') else 0
         self.image_offset_x = random.randint(-4, 4) if self.type in ('tree', 'stone') else 0
+        self.x = x
+        self.y = y
 
     @property
     def x(self):
-        return self.tile_x
+        return self._x  # Get the value of x
+
+    @x.setter
+    def x(self, value):
+        self._x = value  # Set the value of x
 
     @property
     def y(self):
-        return self.tile_y
+        return self._y  # Get the value of y
+
+    @y.setter
+    def y(self, value):
+        self._y = value  # Set the value of y
+
+
+    def harvest(self, bunny):
+        """Handle the harvesting of the tile."""
+        if self.type == 'dirt' and self.plant and self.plant.harvestable:
+            # Perform harvesting logic
+            self.plant.harvest(bunny)
+            bunny.inventory.show_notification(f"Harvested {self.plant.name}!", (200, 200, 0))
+            self.plant = None  # Remove the plant after harvesting
+            return True
+        else:
+            bunny.inventory.show_notification("Nothing to harvest here", (200, 200, 200))
+            return False
 
     def water(self):
         self.watered = True
@@ -248,7 +271,16 @@ class Plant:
         self.max_stage = self.config["stages"] - 1
         self.planted_time = pygame.time.get_ticks()
         self.harvestable = False
-        
+
+    def harvest(self, bunny):
+        """Harvest the plant."""
+        if self.harvestable:
+            # Add harvested item to bunny's inventory
+            bunny.inventory.add_item(self.crop_type)
+            print(f"{self.crop_type} harvested!")
+            return True
+        return False
+
     def update(self, current_season):
         now = pygame.time.get_ticks()
         

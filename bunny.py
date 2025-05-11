@@ -5,7 +5,7 @@ from collections import defaultdict
 
 
 class Bunny:
-    def __init__(self, x, y, mode='farm',username = 'Unknown'):
+    def __init__(self, x, y, mode='farm', username='Unknown'):
         self.name = username
         self.x, self.y = x, y
         self.health = 100
@@ -23,7 +23,6 @@ class Bunny:
             Config.get('bun_size')
         )
 
-        self.attack_cooldown = 0
         self.attacking = False
         self.current_frame = 0
         self.frame_time = 1000 // Config.get('FPS')
@@ -53,6 +52,20 @@ class Bunny:
             'speed': 0.3,  # Speed of the projectiles
             'projectiles': []  # List to store active projectiles
         }
+
+    def record_enemy_event(self, enemy_type, event):
+        """Record each kill or faint event for an enemy type to CSV."""
+        with open("Data/Enemy_difficulty.csv", "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([enemy_type, event])
+
+    def record_kill(self, enemy_type):
+        """Log a kill event."""
+        self.record_enemy_event(enemy_type, "kill")
+
+    def record_death(self, enemy_type):
+        """Log a faint (death) event."""
+        self.record_enemy_event(enemy_type, "fainted")
 
     def start_action(self, action_type, target_tile):
         """Start an action with progress tracking"""

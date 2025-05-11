@@ -1,8 +1,8 @@
 {
     "Unknown": {
-        "Day": 12,
+        "Day": 19,
         "Date": "Monday",
-        "Week": 2,
+        "Week": 3,
         "Season": "Spring",
         "Year": 1,
         "Time": "7:00",
@@ -22,7 +22,7 @@
             "carrot_seed": 5,
             "potato_seed": 5
         },
-        "Money": 68,
+        "Money": 29,
         "Relationship": {}
     },
     "Mint": {

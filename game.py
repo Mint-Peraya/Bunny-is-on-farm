@@ -404,12 +404,12 @@ class Game:
                     elif tile.type == 'dirt':
                         if not tile.dug:
                             self.bunny.start_action('dig', tile)
-                        elif tile.plant and tile.plant.harvestable:
-                            tile.harvest(self.bunny)
                         elif tile.dug and not tile.plant:
-                            # Water the tile if empty and dug
                             tile.water()
-                            
+                        else:
+                            tile.harvest(self.bunny)
+                       
+                                            
         elif self.bunny.mode == 'maze':
             # Only interact with non-portal objects in maze
             front_x, front_y = self.bunny.get_front_position()

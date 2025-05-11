@@ -229,12 +229,14 @@ class Enemy:
     def __init__(self, x, y, enemy_type="normal"):
         self.x = x
         self.y = y
-        self.enemy_type = enemy_type
+        self.enemy_type = enemy_type  # Track the type of the enemy
         self.rect = pygame.Rect(
             self.x * Config.get('bun_size'), 
             self.y * Config.get('bun_size'), 
             Config.get('bun_size'), 
             Config.get('bun_size'))
+        self.health = 100  # Adjust health as needed
+        self.max_health = self.health
         self.is_awake = False
         self.has_dropped_loot = False
         
@@ -254,6 +256,23 @@ class Enemy:
         if enemy_type == "rare":
             self.shield_active = True
             self.shield_health = 50
+
+    def take_damage(self, amount, bunny):
+        """Handle taking damage and check if the enemy dies."""
+        self.health -= amount
+        if self.health <= 0:
+            self.die(bunny)
+
+    def die(self, bunny):
+        """Handle the death of the enemy."""
+        self.health = 0  # Ensure health is set to zero when dead
+        self.on_death(bunny)  # Call the on_death method to handle the kill logic
+
+    def on_death(self, bunny):
+        """This method is called when an enemy dies."""
+        bunny.record_kill(self.enemy_type)  # Log the kill for the specific enemy type
+        print(f"{self.enemy_type} enemy defeated!")
+        # Optionally, handle loot drops or other effects here
 
     def update(self, bunny, dungeon):
         """Update enemy state and movement"""
